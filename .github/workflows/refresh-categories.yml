@@ -1,0 +1,35 @@
+name: Refresh sector categories
+
+on:
+  schedule:
+    # 每月 1 日 17:30 台北時間,更新 CMoney 類股成份
+    - cron: '30 9 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Scrape categories
+        run: node scripts/scrape_categories.mjs
+
+      - name: Build report
+        run: node scripts/build_report.mjs
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/categories.json docs README.md
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Refresh categories $(TZ=Asia/Taipei date +%F)"
+          git push

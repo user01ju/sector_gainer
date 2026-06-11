@@ -1,0 +1,6 @@
+# Excel 工作檔(XQ/手動分析用,不進 repo)
+*.xlsx
+~$*
+
+node_modules/
+scrape_cmoney.mjs

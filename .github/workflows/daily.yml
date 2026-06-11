@@ -1,0 +1,43 @@
+name: Daily update
+
+on:
+  schedule:
+    # 18:00 台北時間(盤後資料已齊),週一~週五
+    - cron: '0 10 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 補抓最近 7 天(防 runner 某天沒跑造成斷層),休市日自動略過
+      - name: Fetch daily quotes
+        run: node scripts/fetch_daily.mjs --backfill 7
+
+      - name: Fetch ex-rights reference prices
+        run: node scripts/fetch_exrights.mjs --backfill 7
+
+      - name: Build report
+        run: node scripts/build_report.mjs
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data docs README.md
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Daily update $(TZ=Asia/Taipei date +%F)"
+          git push
