@@ -30,8 +30,11 @@ const dates = files.map(f => f.slice(0, 10));
 function loadDay(f) {
   const map = new Map();
   for (const ln of readFileSync(join(DAILY, f), 'utf8').split('\n').slice(1)) {
-    const [id, , , close, change, turnover] = ln.split(',');
-    if (id) map.set(id, { close: +close, change: change === '' ? null : +change, turnover: +turnover });
+    const [id, , , close, change, turnover, high, low] = ln.split(',');
+    if (id) map.set(id, {
+      close: +close, change: change === '' ? null : +change, turnover: +turnover,
+      high: high ? +high : null, low: low ? +low : null,
+    });
   }
   return map;
 }
@@ -65,9 +68,10 @@ const latestDate = dates[T];
 const series = new Map(); // id -> { pos:[dayIdx], cum:[還原指數], last:{...} }
 rawDays.forEach((day, i) => {
   if (dropped[i]) return;
-  for (const [id, { close, change, turnover }] of day) {
+  for (const [id, { close, change, turnover, high, low }] of day) {
     let s = series.get(id);
-    if (!s) { s = { pos: [], cum: [], pc: null, lastIdx: null }; series.set(id, s); }
+    if (!s) { s = { pos: [], cum: [], hl: [], pc: null, lastIdx: null }; series.set(id, s); }
+    s.hl.push(high != null && low != null && low > 0 ? high / low - 1 : null);
     const exref = exrights.get(`${dates[i]}|${id}`);
     const base = exref ?? s.pc;
     let ret = base != null && base > 0 ? close / base : 1;
@@ -239,4 +243,60 @@ ${mdRows}
 // ---------- docs/data.js(靜態頁 docs/index.html 以 <script src=data.js> 載入,file:// 也可用) ----------
 writeFileSync(join(ROOT, 'docs', 'data.js'), 'window.REPORT=' + JSON.stringify(report) + ';', 'utf8');
 
-console.error(`Report built for ${latestDate}: ${sectors.length} sectors -> docs/data.js, docs/report.json, README.md`);
+// ---------- docs/scanner.js(Qullamaggie 式掃描指標,個股層級) ----------
+const stockNames = new Map(), stockSectors = new Map();
+for (const cat of categories) for (const st of cat.stocks) {
+  stockNames.set(st.id, st.name);
+  if (!stockSectors.has(st.id)) stockSectors.set(st.id, []);
+  stockSectors.get(st.id).push(cat.name);
+}
+const start12 = baseIdx.m12 >= 0 ? baseIdx.m12 : 0;
+const scanStocks = [];
+for (const [id, s] of series) {
+  if (!s.last || !stockSectors.has(id)) continue;
+  const m = stockMetrics(id);
+  if (!m) continue;
+  const cumT = s.cum[s.cum.length - 1];
+  // ADR20:近 20 日平均 (最高/最低 - 1),Qullamaggie 定義
+  const hl = s.hl.filter(v => v != null).slice(-20);
+  const adr = hl.length >= 10 ? +(hl.reduce((a, b) => a + b, 0) / hl.length * 100).toFixed(2) : null;
+  // 距 52 週(資料窗口)還原高點
+  let maxCum = 0;
+  for (let j = s.pos.length - 1; j >= 0 && s.pos[j] >= start12; j--) if (s.cum[j] > maxCum) maxCum = s.cum[j];
+  const off = maxCum > 0 ? +((cumT / maxCum - 1) * 100).toFixed(1) : null;
+  // 還原序列對 MA 的距離
+  const maDist = n => {
+    if (s.cum.length < n) return null;
+    let sum = 0;
+    for (let j = s.cum.length - n; j < s.cum.length; j++) sum += s.cum[j];
+    return +((cumT / (sum / n) - 1) * 100).toFixed(1);
+  };
+  // 10 日收縮度:近 10 日還原高低區間 %
+  let tight = null;
+  if (s.cum.length >= 10) {
+    const w = s.cum.slice(-10);
+    tight = +((Math.max(...w) / Math.min(...w) - 1) * 100).toFixed(1);
+  }
+  // 動能預篩通過者才帶 sparkline,控制檔案大小
+  let spark = [];
+  if ((m.m1 != null && m.m1 >= 15) || (m.m3 != null && m.m3 >= 30)) {
+    let base = null;
+    spark = sparkSamples.map(idx => {
+      const c = cumAt(id, idx);
+      if (c == null) return null;
+      if (base == null) base = c;
+      return +((c / base - 1) * 100).toFixed(1);
+    });
+  }
+  scanStocks.push({
+    id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'),
+    close: m.close, turnover: m.turnover,
+    adr, off, ma10: maDist(10), ma20: maDist(20), ma50: maDist(50), tight,
+    ...Object.fromEntries(METRICS.map(k => [k, m[k] == null ? null : +m[k].toFixed(2)])),
+    spark,
+  });
+}
+writeFileSync(join(ROOT, 'docs', 'scanner.js'),
+  'window.SCANNER=' + JSON.stringify({ date: latestDate, stocks: scanStocks }) + ';', 'utf8');
+
+console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} scan stocks -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);

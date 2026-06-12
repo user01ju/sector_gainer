@@ -3,7 +3,7 @@
 //   node scripts/fetch_daily.mjs                  -> today (Asia/Taipei)
 //   node scripts/fetch_daily.mjs 2026-06-11       -> specific date
 //   node scripts/fetch_daily.mjs --backfill 370   -> past N calendar days (skips existing files)
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -54,6 +54,8 @@ async function fetchTwse(ymd) {
         close,
         change: close == null || diff == null ? null : sign * diff,
         turnover: num(r[fi['成交金額']]) ?? 0,
+        high: num(r[fi['最高價']]),
+        low: num(r[fi['最低價']]),
       };
     })
     .filter(s => s.close != null);
@@ -77,6 +79,8 @@ async function fetchTpex(ymd) {
         close,
         change: num(r[fi['漲跌']]),
         turnover: num(r[fi[turnKey]]) ?? 0,
+        high: num(r[fi['最高']]),
+        low: num(r[fi['最低']]),
       };
     })
     .filter(s => s.close != null);
@@ -87,25 +91,80 @@ async function fetchDay(date) {
   const [twse, tpex] = [await fetchTwse(date), await fetchTpex(date)];
   const rows = [...twse, ...tpex];
   if (rows.length < 100) return false; // 休市日
-  const csv = ['id,name,market,close,change,turnover',
-    ...rows.map(s => `${s.id},${s.name.replace(/,/g, '')},${s.market},${s.close},${s.change ?? ''},${s.turnover}`)].join('\n');
+  // 單邊缺漏(被擋/暫時故障)寧可不寫,留給下次補抓,避免殘缺檔污染報酬鏈
+  if (twse.length < 500 || tpex.length < 300) {
+    process.stderr.write(`${date}: INCOMPLETE (TWSE ${twse.length} / TPEX ${tpex.length}) - not written\n`);
+    return false;
+  }
+  const csv = ['id,name,market,close,change,turnover,high,low',
+    ...rows.map(s => `${s.id},${s.name.replace(/,/g, '')},${s.market},${s.close},${s.change ?? ''},${s.turnover},${s.high ?? ''},${s.low ?? ''}`)].join('\n');
   writeFileSync(file, csv, 'utf8');
   process.stderr.write(`${date}: ${rows.length} rows (TWSE ${twse.length} / TPEX ${tpex.length})\n`);
   return true;
+}
+
+// 增補模式:只把 high/low 併入既有檔案,收盤價必須與舊檔一致(>=95% 吻合)才寫入。
+// 不改動已驗證的 close/change/turnover,新到舊處理(ADR 只需近 20 日,先求近期可用)。
+async function augmentDay(file) {
+  const date = file.slice(0, 10);
+  const path = join(OUT_DIR, file);
+  const lines = readFileSync(path, 'utf8').split('\n');
+  if (lines[0].includes('high')) return 'done';
+  const [twse, tpex] = [await fetchTwse(date), await fetchTpex(date)];
+  const map = new Map([...twse, ...tpex].map(s => [s.id, s]));
+  let ok = 0, tot = 0;
+  const out = [lines[0] + ',high,low'];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i]) continue;
+    const parts = lines[i].split(',');
+    const close = +parts[3];
+    const n = map.get(parts[0]);
+    tot++;
+    if (n && Math.abs(n.close - close) <= close * 0.005) {
+      ok++;
+      out.push(lines[i] + ',' + (n.high ?? '') + ',' + (n.low ?? ''));
+    } else out.push(lines[i] + ',,');
+  }
+  if (!tot || ok / tot < 0.95) {
+    process.stderr.write(`${date}: AUGMENT SKIP (matched ${ok}/${tot})\n`);
+    return 'skip';
+  }
+  writeFileSync(path, out.join('\n'), 'utf8');
+  process.stderr.write(`${date}: augmented (${ok}/${tot})\n`);
+  return 'ok';
 }
 
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const args = process.argv.slice(2);
 
+  if (args[0] === '--augment') {
+    const files = readdirSync(OUT_DIR).filter(f => /^\d{4}-\d{2}-\d{2}\.csv$/.test(f)).sort().reverse();
+    let skipped = 0;
+    for (const f of files) {
+      try {
+        const r = await augmentDay(f);
+        if (r === 'done') continue;
+        if (r === 'skip') skipped++;
+      } catch (e) {
+        process.stderr.write(`${f}: ERROR ${e.message}\n`);
+        skipped++;
+      }
+      await sleep(900);
+    }
+    process.stderr.write(`augment finished, skipped ${skipped}\n`);
+    return;
+  }
+
   if (args[0] === '--backfill') {
     const days = parseInt(args[1] || '370', 10);
+    const force = args.includes('--force');
     const today = new Date(taipeiToday());
     for (let i = days; i >= 0; i--) {
       const d = new Date(today.getTime() - i * 86400e3);
       if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue;
       const date = d.toISOString().slice(0, 10);
-      if (existsSync(join(OUT_DIR, `${date}.csv`))) continue;
+      if (!force && existsSync(join(OUT_DIR, `${date}.csv`))) continue;
       try {
         await fetchDay(date);
       } catch (e) {
