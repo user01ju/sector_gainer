@@ -122,7 +122,7 @@
   <div class="tbl-wrap">
   <table id="scanTbl">
     <thead><tr>
-      <th data-sk="id">代碼 名稱</th><th class="nosort">族群</th><th data-sk="close">收盤</th>
+      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="close">收盤</th>
       <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th>
       <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th>
       <th data-sk="m3">3m%</th><th data-sk="m6">6m%</th><th data-sk="m12">12m%</th>
@@ -386,7 +386,7 @@ function renderScan() {
   });
   rows.sort((a, b) => {
     const va = a[scanSortKey], vb = b[scanSortKey];
-    if (typeof va === 'string') return va.localeCompare(vb) * -scanSortDir;
+    if (typeof va === 'string') return va.localeCompare(vb, 'zh-TW') * -scanSortDir;
     return ((va ?? -9999) - (vb ?? -9999)) * scanSortDir;
   });
   document.getElementById('scanCount').textContent = rows.length + ' 檔' + (rows.length > 200 ? '(顯示前 200)' : '');
