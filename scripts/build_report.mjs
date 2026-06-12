@@ -1,5 +1,5 @@
 // Build sector-weighted gain report from data/daily/*.csv + data/exrights.csv + data/categories.json
-// -> docs/index.html (互動報表) + docs/report.json + README.md
+// -> docs/data.js + docs/report.json + README.md(docs/index.html 為靜態互動頁,讀 data.js)
 //
 // 漲幅計算:每日還原報酬鏈 ret[t] = close[t]/ref[t] - 1,
 //   ref[t] = 除權息參考價(除權息日)或 close[t] - 漲跌價差(一般日)。
@@ -131,6 +131,42 @@ function stockMetrics(id) {
 // ---------- aggregate ----------
 const categories = JSON.parse(readFileSync(join(ROOT, 'data', 'categories.json'), 'utf8'));
 
+// 個股還原指數在 idx(含)以前最近一筆
+function cumAt(id, idx) {
+  const s = series.get(id);
+  if (!s) return null;
+  let lo = 0, hi = s.pos.length - 1, found = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (s.pos[mid] <= idx) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+  return found >= 0 ? s.cum[found] : null;
+}
+
+// sparkline 取樣點:12 個月窗口內的保留日,均勻取最多 60 點
+const sparkSamples = (() => {
+  const start = baseIdx.m12 >= 0 ? baseIdx.m12 : 0;
+  const kept = [];
+  for (let i = start; i <= T; i++) if (!dropped[i]) kept.push(i);
+  if (kept.length <= 60) return kept;
+  return Array.from({ length: 60 }, (_, j) => kept[Math.round(j * (kept.length - 1) / 59)]);
+})();
+
+// 類股加權還原指數序列(% 相對窗口起點),加權方式與報表一致
+function sparkOf(stocks) {
+  const members = stocks
+    .map(x => ({ w: x.weight, id: x.id, base: cumAt(x.id, sparkSamples[0]) }))
+    .filter(x => x.base != null && x.w > 0);
+  if (!members.length) return [];
+  return sparkSamples.map(idx => {
+    let num = 0, den = 0;
+    for (const x of members) {
+      const c = cumAt(x.id, idx);
+      if (c == null) continue;
+      num += x.w * (c / x.base);
+      den += x.w;
+    }
+    return den > 0 ? +((num / den - 1) * 100).toFixed(1) : null;
+  });
+}
+
 const sectors = categories.map(cat => {
   const stocks = cat.stocks
     .map(st => {
@@ -160,6 +196,7 @@ const sectors = categories.map(cat => {
     code: cat.code,
     count: stocks.length,
     turnover: totalTurnover,
+    spark: sparkOf(stocks),
     ...agg,
     stocks: stocks.map(x => ({
       id: x.id, name: x.name, close: x.close,
@@ -199,123 +236,7 @@ ${mdRows}
 > 資料來源:TWSE / TPEX 每日收盤行情與除權息參考價;類股分類:CMoney
 `, 'utf8');
 
-// ---------- docs/index.html ----------
-const html = `<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>台股類股漲幅報表 ${latestDate}</title>
-<style>
-  :root { --up:#d6453d; --down:#1a9850; --bg:#fafafa; --line:#e5e5e5; }
-  * { box-sizing:border-box; }
-  body { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; margin:0; background:var(--bg); color:#222; }
-  header { padding:16px 24px 8px; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .sub { color:#777; font-size:12px; }
-  .controls { display:flex; gap:8px; flex-wrap:wrap; padding:8px 24px; align-items:center; }
-  .controls input, .controls select { padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; }
-  .tbl-wrap { padding:0 24px 40px; overflow-x:auto; }
-  table { border-collapse:collapse; width:100%; background:#fff; font-size:13px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-  th, td { padding:7px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
-  th { background:#f0f0f0; cursor:pointer; user-select:none; position:sticky; top:0; text-align:right; }
-  th:nth-child(-n+3), td:nth-child(-n+3) { text-align:left; }
-  td.num { text-align:right; font-variant-numeric:tabular-nums; }
-  tr.sector { cursor:pointer; }
-  tr.sector:hover { background:#f5f9ff; }
-  tr.stock { background:#fcfcfc; color:#444; font-size:12px; }
-  tr.stock td:first-child { padding-left:28px; }
-  .up { color:var(--up); } .down { color:var(--down); }
-  .arrow { color:#999; font-size:10px; }
-  .bar { display:inline-block; height:8px; background:#c8d9f0; border-radius:2px; margin-right:6px; vertical-align:middle; }
-</style>
-</head>
-<body>
-<header>
-  <h1>台股類股漲幅報表</h1>
-  <div class="sub">更新:${latestDate} ・ 當日成交金額占比加權 ・ 還原權息 ・ 基準日 1w:${baseDates.w1} / 1m:${baseDates.m1} / 3m:${baseDates.m3} / 6m:${baseDates.m6} / 12m:${baseDates.m12}</div>
-</header>
-<div class="controls">
-  <select id="parentSel"><option value="">全部大類</option></select>
-  <input id="search" placeholder="搜尋類股 / 個股代碼名稱" size="24">
-  <span class="sub">點欄位標題排序,點類股列展開成份股</span>
-</div>
-<div class="tbl-wrap">
-<table id="tbl">
-  <thead><tr>
-    <th data-k="parent">大類</th><th data-k="name">子類股</th><th data-k="count">檔數</th>
-    <th data-k="turnover">成交金額(億)</th>
-    <th data-k="d">當日%</th><th data-k="w1">1w%</th><th data-k="m1">1m%</th>
-    <th data-k="m3">3m%</th><th data-k="m6">6m%</th><th data-k="m12">12m%</th>
-  </tr></thead>
-  <tbody></tbody>
-</table>
-</div>
-<script>
-const R = ${JSON.stringify(report)};
-const METRICS = ['d','w1','m1','m3','m6','m12'];
-let sortKey = 'd', sortDir = -1, expanded = new Set();
+// ---------- docs/data.js(靜態頁 docs/index.html 以 <script src=data.js> 載入,file:// 也可用) ----------
+writeFileSync(join(ROOT, 'docs', 'data.js'), 'window.REPORT=' + JSON.stringify(report) + ';', 'utf8');
 
-const fmt = v => v == null ? '--' : v.toFixed(2);
-const cls = v => v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '';
-const cell = v => '<td class="num ' + cls(v) + '">' + fmt(v) + '</td>';
-
-function render() {
-  const parent = document.getElementById('parentSel').value;
-  const q = document.getElementById('search').value.trim().toLowerCase();
-  let rows = R.sectors.filter(s => !parent || s.parent === parent);
-  if (q) rows = rows.filter(s =>
-    s.name.toLowerCase().includes(q) || s.parent.includes(q) ||
-    s.stocks.some(x => x.id.includes(q) || x.name.toLowerCase().includes(q)));
-  rows = rows.slice().sort((a, b) => {
-    const va = a[sortKey], vb = b[sortKey];
-    if (typeof va === 'string') return va.localeCompare(vb, 'zh-TW') * -sortDir;
-    return ((vb ?? -9999) - (va ?? -9999)) * sortDir;
-  });
-  const tb = document.querySelector('#tbl tbody');
-  tb.innerHTML = rows.map(s => {
-    const key = s.parent + '|' + s.name;
-    const open = expanded.has(key);
-    let h = '<tr class="sector" data-key="' + key + '">' +
-      '<td>' + s.parent + '</td>' +
-      '<td><span class="arrow">' + (open ? '▼' : '▶') + '</span> ' + s.name + '</td>' +
-      '<td class="num">' + s.count + '</td>' +
-      '<td class="num">' + (s.turnover / 1e8).toFixed(1) + '</td>' +
-      METRICS.map(k => cell(s[k])).join('') + '</tr>';
-    if (open) {
-      h += s.stocks.map(x =>
-        '<tr class="stock"><td>' + x.id + ' ' + x.name + '</td>' +
-        '<td><span class="bar" style="width:' + Math.min(100, x.weight * 2) + 'px"></span>' + x.weight.toFixed(1) + '%</td>' +
-        '<td class="num">' + x.close + '</td>' +
-        '<td class="num">' + (x.turnover / 1e8).toFixed(1) + '</td>' +
-        METRICS.map(k => cell(x[k])).join('') + '</tr>').join('');
-    }
-    return h;
-  }).join('');
-}
-
-document.querySelectorAll('#tbl th').forEach(th => th.onclick = () => {
-  const k = th.dataset.k;
-  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; }
-  render();
-});
-document.querySelector('#tbl tbody').onclick = e => {
-  const tr = e.target.closest('tr.sector');
-  if (!tr) return;
-  const k = tr.dataset.key;
-  expanded.has(k) ? expanded.delete(k) : expanded.add(k);
-  render();
-};
-[...new Set(R.sectors.map(s => s.parent))].forEach(p => {
-  const o = document.createElement('option'); o.value = o.textContent = p;
-  document.getElementById('parentSel').appendChild(o);
-});
-document.getElementById('parentSel').onchange = render;
-document.getElementById('search').oninput = render;
-render();
-</script>
-</body>
-</html>`;
-writeFileSync(join(ROOT, 'docs', 'index.html'), html, 'utf8');
-
-console.error(`Report built for ${latestDate}: ${sectors.length} sectors -> docs/index.html, docs/report.json, README.md`);
+console.error(`Report built for ${latestDate}: ${sectors.length} sectors -> docs/data.js, docs/report.json, README.md`);
