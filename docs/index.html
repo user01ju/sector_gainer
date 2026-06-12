@@ -157,7 +157,14 @@ function filtered() {
 
 // ---------- 表格 ----------
 let sortKey = 'd', sortDir = -1, expanded = new Set();
+function updateSortMarks() {
+  document.querySelectorAll('#tbl th[data-k]').forEach(th => {
+    if (!th.dataset.label) th.dataset.label = th.textContent;
+    th.textContent = th.dataset.label + (th.dataset.k === sortKey ? (sortDir === -1 ? ' ▼' : ' ▲') : '');
+  });
+}
 function renderTable() {
+  updateSortMarks();
   let rows = filtered().slice().sort((a, b) => {
     const va = a[sortKey], vb = b[sortKey];
     if (typeof va === 'string') return va.localeCompare(vb, 'zh-TW') * -sortDir;
