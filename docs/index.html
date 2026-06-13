@@ -44,7 +44,7 @@
 </head>
 <body>
 <header>
-  <h1>台股類股漲幅報表 <span id="hdate" style="font-weight:400;font-size:14px;color:#777;"></span></h1>
+  <h1>台股類股漲幅報表 <span id="hdate" style="font-weight:400;font-size:14px;color:#777;"></span> <span id="lights" style="font-weight:400;font-size:13px;margin-left:10px;"></span></h1>
   <div class="sub" id="hsub"></div>
 </header>
 <div class="controls">
@@ -53,6 +53,7 @@
     <button data-v="map">市場地圖</button>
     <button data-v="scatter">動能散點</button>
     <button data-v="scan">突破掃描</button>
+    <button data-v="trend">市場趨勢</button>
   </div>
   <select id="parentSel"><option value="">全部大類</option></select>
   <input id="search" placeholder="搜尋類股 / 個股代碼名稱" size="22">
@@ -117,13 +118,14 @@
     <label class="sub">量 ≥ <input type="number" id="scVol" value="3" style="width:50px"> 億</label>
     <label class="sub">ADR ≥ <input type="number" id="scAdr" value="2.5" step="0.5" style="width:52px"> %</label>
     <label class="sub">距高 ≤ <input type="number" id="scOff" value="25" style="width:50px"> %</label>
+    <label class="sub">量縮 ≤ <input type="number" id="scVq" step="0.1" placeholder="不限" style="width:54px"></label>
     <span class="sub" id="scanCount" style="font-weight:600;"></span>
   </div>
   <div class="tbl-wrap">
   <table id="scanTbl">
     <thead><tr>
       <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="close">收盤</th>
-      <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th>
+      <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th><th data-sk="vq">量縮</th><th data-sk="p10">距10高%</th>
       <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th>
       <th data-sk="m3">3m%</th><th data-sk="m6">6m%</th><th data-sk="m12">12m%</th>
       <th class="nosort">1y 走勢</th>
@@ -132,6 +134,11 @@
   </table>
   </div>
   <div class="legend">收縮中 = 動能腿後短線整理(Q 式旗形候選);今日突破 = 昨日仍在收縮帶、今日大漲;ADR20 為收盤高低價計算。族群篩選不適用本頁,搜尋適用。</div>
+</div>
+
+<div class="view" id="v-trend" style="display:none;">
+  <div id="trendBox"></div>
+  <div class="legend">燈號:🟢 收盤站上 MA10 與 MA20(正常進攻)・🟡 介於兩線之間(只持有不加倉)・🔴 雙雙跌破(防守/空手)。廣度與新高新低以還原序列計,上市滿半年才列入新高低統計。</div>
 </div>
 
 <script src="data.js"></script>
@@ -374,6 +381,8 @@ function renderScan() {
     if (x.turnover < VOL) return false;
     if (ADR > 0 && (x.adr == null || x.adr < ADR)) return false;
     if (x.off == null || x.off < -OFF) return false;
+    const VQ = parseFloat(document.getElementById('scVq').value);
+    if (!isNaN(VQ) && (x.vq == null || x.vq > VQ)) return false;
     if (mode === 'flag') {
       if (x.w1 == null || x.w1 < W1lo || x.w1 > W1hi) return false;
       if (x.d == null || Math.abs(x.d) > Dmax) return false;
@@ -398,6 +407,8 @@ function renderScan() {
     '<td class="num">' + (x.adr == null ? '--' : x.adr.toFixed(1)) + '</td>' +
     '<td class="num">' + (x.off == null ? '--' : x.off.toFixed(1)) + '</td>' +
     '<td class="num">' + (x.tight == null ? '--' : x.tight.toFixed(1)) + '</td>' +
+    '<td class="num">' + (x.vq == null ? '--' : x.vq.toFixed(2)) + '</td>' +
+    '<td class="num">' + (x.p10 == null ? '--' : x.p10.toFixed(1)) + '</td>' +
     METRICS.map(k => cellStk(x[k], k)).join('') +
     '<td>' + sparkSvg(x.spark) + '</td></tr>').join('');
 }
@@ -408,22 +419,93 @@ document.querySelectorAll('#scanTbl th[data-sk]').forEach(th => th.onclick = () 
 });
 document.querySelectorAll('#v-scan select, #v-scan input').forEach(el => el.onchange = renderScan);
 
+// ---------- 大盤燈號 ----------
+const DOT = { green: '🟢', yellow: '🟡', red: '🔴' };
+(function renderLights() {
+  const m = R.market;
+  if (!m) return;
+  const part = (label, s) => s ? label + ' ' + Math.round(s.close[s.close.length - 1]).toLocaleString() + ' ' + DOT[s.light] : '';
+  document.getElementById('lights').textContent = [part('加權', m.taiex), part('櫃買', m.otc)].filter(Boolean).join('  ');
+})();
+
+// ---------- 市場趨勢 ----------
+function lineChart(title, dates, seriesArr, opts = {}) {
+  const W = 980, H = 200, M = { l: 56, r: 12, t: 24, b: 22 };
+  let all = [];
+  for (const s of seriesArr) all = all.concat(s.vals.filter(v => v != null));
+  if (opts.bars || opts.refline != null) all.push(opts.refline ?? 0);
+  let mn = Math.min(...all), mx = Math.max(...all);
+  const pad = (mx - mn) * 0.06 || 1; mn -= pad; mx += pad;
+  const n = dates.length;
+  const X = i => M.l + i * (W - M.l - M.r) / Math.max(1, n - 1);
+  const Y = v => H - M.b - (v - mn) / (mx - mn) * (H - M.t - M.b);
+  let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px;">';
+  g += '<text x="' + M.l + '" y="15" font-size="12" fill="#444">' + title + '</text>';
+  for (const t of niceTicks(mn, mx, 4)) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="#f0f0f0"/>' +
+    '<text x="' + (M.l - 6) + '" y="' + (Y(t) + 4) + '" font-size="10" fill="#999" text-anchor="end">' + (Math.abs(t) >= 10000 ? Math.round(t / 1000) + 'k' : +t.toFixed(1)) + '</text>';
+  const step = Math.max(1, Math.floor(n / 6));
+  for (let i = 0; i < n; i += step) g += '<text x="' + X(i) + '" y="' + (H - 6) + '" font-size="10" fill="#999" text-anchor="middle">' + dates[i].slice(2, 7) + '</text>';
+  if (opts.refline != null) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(opts.refline) + '" y2="' + Y(opts.refline) + '" stroke="#bbb" stroke-dasharray="4 3"/>';
+  if (opts.bars) {
+    const bw = Math.max(1, (W - M.l - M.r) / n - 1);
+    const s = seriesArr[0];
+    for (let i = 0; i < n; i++) {
+      const v = s.vals[i];
+      if (v == null) continue;
+      const y0 = Y(0), y1 = Y(v);
+      g += '<rect x="' + (X(i) - bw / 2) + '" y="' + Math.min(y0, y1) + '" width="' + bw + '" height="' + Math.max(0.5, Math.abs(y0 - y1)) + '" fill="' + (v >= 0 ? 'rgba(214,69,61,.75)' : 'rgba(26,152,80,.75)') + '"/>';
+    }
+    g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="#999"/>';
+  } else {
+    for (const s of seriesArr) {
+      const pts = [];
+      for (let i = 0; i < n; i++) if (s.vals[i] != null) pts.push(X(i).toFixed(1) + ',' + Y(s.vals[i]).toFixed(1));
+      g += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.w || 1.2) + '"' + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') + '/>';
+    }
+    let lx = W - M.r - 10;
+    for (const s of [...seriesArr].reverse()) {
+      g += '<text x="' + lx + '" y="15" font-size="10" fill="' + s.color + '" text-anchor="end">' + s.label + '</text>';
+      lx -= (s.label.length * 10 + 14);
+    }
+  }
+  return g + '</svg>';
+}
+function renderTrend() {
+  const box = document.getElementById('trendBox');
+  let h = '';
+  const m = R.market || {};
+  const idx = (s, name) => s ? lineChart(name + ' ' + DOT[s.light], s.dates,
+    [{ vals: s.close, color: '#222', w: 1.4, label: '收盤' },
+     { vals: s.ma10, color: '#d6453d', label: 'MA10' },
+     { vals: s.ma20, color: '#2b5d9b', label: 'MA20' }]) : '';
+  h += idx(m.taiex, '加權指數') + idx(m.otc, '櫃買指數');
+  const b = R.breadth;
+  if (b) {
+    h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%)', b.dates,
+      [{ vals: b.above20, color: '#2b5d9b', w: 1.4, label: '' }], { refline: 50 });
+    h += lineChart('52 週淨新高(新高 − 新低,目前 ' + b.net[b.net.length - 1] + ')', b.dates,
+      [{ vals: b.net, color: '#888', label: '' }], { bars: true });
+  }
+  box.innerHTML = h || '<p class="sub">尚無指數資料,請先執行 scripts/fetch_index.mjs</p>';
+}
+
 // ---------- 共用 ----------
 let view = 'table';
-const HINTS = { table: '點欄位標題排序,點類股列展開成份股', map: '', scatter: '', scan: '' };
+const HINTS = { table: '點欄位標題排序,點類股列展開成份股', map: '', scatter: '', scan: '', trend: '' };
 function render() {
   document.getElementById('hint').textContent = HINTS[view];
   if (view === 'table') renderTable();
   else if (view === 'map') renderMap();
   else if (view === 'scatter') renderScatter();
-  else renderScan();
+  else if (view === 'scan') renderScan();
+  else renderTrend();
 }
 document.getElementById('tabs').onclick = e => {
   const b = e.target.closest('button');
   if (!b) return;
   view = b.dataset.v;
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
-  for (const v of ['table', 'map', 'scatter', 'scan']) document.getElementById('v-' + v).style.display = v === view ? '' : 'none';
+  for (const v of ['table', 'map', 'scatter', 'scan', 'trend']) document.getElementById('v-' + v).style.display = v === view ? '' : 'none';
   render();
 };
 [...new Set(R.sectors.map(s => s.parent))].forEach(p => {

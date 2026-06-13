@@ -30,6 +30,9 @@ jobs:
       - name: Fetch ex-rights reference prices
         run: node scripts/fetch_exrights.mjs --backfill 7
 
+      - name: Fetch market indices
+        run: node scripts/fetch_index.mjs
+
       - name: Build report
         run: node scripts/build_report.mjs
 

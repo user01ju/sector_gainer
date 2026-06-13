@@ -1,22 +1,26 @@
 @echo off
 cd /d "%~dp0"
 
-echo === [1/4] Fetch daily quotes (last 7 days, skip existing/holidays) ===
+echo === [1/5] Fetch daily quotes (last 7 days, skip existing/holidays) ===
 node scripts\fetch_daily.mjs --backfill 7
 if errorlevel 1 goto :fail
 
-echo === [2/4] Fetch ex-rights reference prices ===
+echo === [2/5] Fetch ex-rights reference prices ===
 node scripts\fetch_exrights.mjs --backfill 7
 if errorlevel 1 goto :fail
 
-echo === [3/4] Build report ===
+echo === [3/5] Fetch market indices ===
+node scripts\fetch_index.mjs
+if errorlevel 1 goto :fail
+
+echo === [4/5] Build report ===
 node scripts\build_report.mjs
 if errorlevel 1 goto :fail
 
 echo Done. Opening report...
 start "" "%~dp0docs\index.html"
 
-echo === [4/4] Commit and push ===
+echo === [5/5] Commit and push ===
 git add -A
 git diff --cached --quiet
 if not errorlevel 1 (

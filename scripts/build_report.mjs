@@ -70,8 +70,9 @@ rawDays.forEach((day, i) => {
   if (dropped[i]) return;
   for (const [id, { close, change, turnover, high, low }] of day) {
     let s = series.get(id);
-    if (!s) { s = { pos: [], cum: [], hl: [], pc: null, lastIdx: null }; series.set(id, s); }
+    if (!s) { s = { pos: [], cum: [], hl: [], to: [], pc: null, lastIdx: null }; series.set(id, s); }
     s.hl.push(high != null && low != null && low > 0 ? high / low - 1 : null);
+    s.to.push(turnover);
     const exref = exrights.get(`${dates[i]}|${id}`);
     const base = exref ?? s.pc;
     let ret = base != null && base > 0 ? close / base : 1;
@@ -214,7 +215,62 @@ const sectors = categories.map(cat => {
 for (const s of sectors) for (const k of METRICS) if (s[k] != null) s[k] = +s[k].toFixed(2);
 sectors.sort((a, b) => (b.d ?? -999) - (a.d ?? -999));
 
-const report = { date: latestDate, baseDates, sectors };
+// ---------- 大盤指數與紅綠燈 ----------
+let market = null;
+const idxFile = join(ROOT, 'data', 'market_index.csv');
+if (existsSync(idxFile)) {
+  const rows = readFileSync(idxFile, 'utf8').split('\n').slice(1)
+    .map(l => l.split(','))
+    .filter(r => r[0] && r[0] <= latestDate)
+    .map(r => ({ date: r[0], taiex: r[1] ? +r[1] : null, otc: r[2] ? +r[2] : null }));
+  const idxSeries = key => {
+    const pts = rows.filter(r => r[key] != null);
+    if (pts.length < 21) return null;
+    const vals = pts.map(p => p[key]);
+    const maN = n => vals.map((_, i) => i + 1 >= n ? +(vals.slice(i + 1 - n, i + 1).reduce((a, b) => a + b, 0) / n).toFixed(2) : null);
+    const ma10 = maN(10), ma20 = maN(20);
+    const c = vals[vals.length - 1], m10 = ma10[ma10.length - 1], m20 = ma20[ma20.length - 1];
+    const light = c > m10 && c > m20 ? 'green' : c < m10 && c < m20 ? 'red' : 'yellow';
+    const cut = Math.max(0, vals.length - 250);
+    return { dates: pts.slice(cut).map(p => p.date), close: vals.slice(cut), ma10: ma10.slice(cut), ma20: ma20.slice(cut), light };
+  };
+  const taiex = idxSeries('taiex'), otc = idxSeries('otc');
+  if (taiex || otc) market = { taiex, otc };
+}
+
+// ---------- 市場廣度:收盤 > 20MA 比例、52w 淨新高(還原序列,上市滿半年才計新高低) ----------
+const keptOrd = new Array(files.length).fill(-1);
+{ let o = 0; for (let i = 0; i < files.length; i++) if (!dropped[i]) keptOrd[i] = o++; }
+const keptDates = dates.filter((_, i) => !dropped[i]);
+const nK = keptDates.length;
+const bAbove = new Array(nK).fill(0), bDenom = new Array(nK).fill(0);
+const bNh = new Array(nK).fill(0), bNl = new Array(nK).fill(0);
+const memberIds = new Set();
+for (const c of categories) for (const st of c.stocks) memberIds.add(st.id);
+for (const [id, s] of series) {
+  if (!memberIds.has(id)) continue;
+  const cum = s.cum, pos = s.pos;
+  let sum20 = 0;
+  for (let j = 0; j < cum.length; j++) {
+    const ord = keptOrd[pos[j]];
+    sum20 += cum[j];
+    if (j >= 20) sum20 -= cum[j - 20];
+    if (j >= 19) { bDenom[ord]++; if (cum[j] > sum20 / 20) bAbove[ord]++; }
+    if (j >= 126) {
+      let mx = -Infinity, mn = Infinity;
+      for (let k = Math.max(0, j - 251); k <= j; k++) { const v = cum[k]; if (v > mx) mx = v; if (v < mn) mn = v; }
+      if (cum[j] >= mx) bNh[ord]++; else if (cum[j] <= mn) bNl[ord]++;
+    }
+  }
+}
+const bCut = Math.max(0, nK - 250);
+const breadth = {
+  dates: keptDates.slice(bCut),
+  above20: bAbove.slice(bCut).map((v, i) => bDenom[bCut + i] ? +(v / bDenom[bCut + i] * 100).toFixed(1) : null),
+  net: bNh.slice(bCut).map((v, i) => v - bNl[bCut + i]),
+};
+
+const report = { date: latestDate, baseDates, market, breadth, sectors };
 writeFileSync(join(ROOT, 'docs', 'report.json'), JSON.stringify(report), 'utf8');
 
 // ---------- README.md ----------
@@ -277,6 +333,20 @@ for (const [id, s] of series) {
     const w = s.cum.slice(-10);
     tight = +((Math.max(...w) / Math.min(...w) - 1) * 100).toFixed(1);
   }
+  // 量縮比:近 5 日均量 / 近 20 日均量(< 1 = 整理期量縮)
+  let vq = null;
+  if (s.to.length >= 20) {
+    const last20 = s.to.slice(-20);
+    const m20 = last20.reduce((a, b) => a + b, 0) / 20;
+    const m5 = last20.slice(-5).reduce((a, b) => a + b, 0) / 5;
+    vq = m20 > 0 ? +(m5 / m20).toFixed(2) : null;
+  }
+  // 距近 10 日還原高(樞紐價距離代理,0 = 一觸即發)
+  let p10 = null;
+  if (s.cum.length >= 2) {
+    const w = s.cum.slice(-10);
+    p10 = +((cumT / Math.max(...w) - 1) * 100).toFixed(1);
+  }
   // 動能預篩通過者才帶 sparkline,控制檔案大小
   let spark = [];
   if ((m.m1 != null && m.m1 >= 15) || (m.m3 != null && m.m3 >= 30)) {
@@ -291,7 +361,7 @@ for (const [id, s] of series) {
   scanStocks.push({
     id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'),
     close: m.close, turnover: m.turnover,
-    adr, off, ma10: maDist(10), ma20: maDist(20), ma50: maDist(50), tight,
+    adr, off, ma10: maDist(10), ma20: maDist(20), ma50: maDist(50), tight, vq, p10,
     ...Object.fromEntries(METRICS.map(k => [k, m[k] == null ? null : +m[k].toFixed(2)])),
     spark,
   });
