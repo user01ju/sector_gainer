@@ -434,8 +434,10 @@ function lineChart(title, dates, seriesArr, opts = {}) {
   let all = [];
   for (const s of seriesArr) all = all.concat(s.vals.filter(v => v != null));
   if (opts.bars || opts.refline != null) all.push(opts.refline ?? 0);
-  let mn = Math.min(...all), mx = Math.max(...all);
-  const pad = (mx - mn) * 0.06 || 1; mn -= pad; mx += pad;
+  let mn, mx;
+  if (opts.ymin != null && opts.ymax != null) { mn = opts.ymin; mx = opts.ymax; }
+  else { mn = Math.min(...all); mx = Math.max(...all); const pad = (mx - mn) * 0.06 || 1; mn -= pad; mx += pad; }
+  const clamp = v => Math.max(mn, Math.min(mx, v));
   const n = dates.length;
   const X = i => M.l + i * (W - M.l - M.r) / Math.max(1, n - 1);
   const Y = v => H - M.b - (v - mn) / (mx - mn) * (H - M.t - M.b);
@@ -452,7 +454,7 @@ function lineChart(title, dates, seriesArr, opts = {}) {
     for (let i = 0; i < n; i++) {
       const v = s.vals[i];
       if (v == null) continue;
-      const y0 = Y(0), y1 = Y(v);
+      const y0 = Y(0), y1 = Y(clamp(v));
       g += '<rect x="' + (X(i) - bw / 2) + '" y="' + Math.min(y0, y1) + '" width="' + bw + '" height="' + Math.max(0.5, Math.abs(y0 - y1)) + '" fill="' + (v >= 0 ? 'rgba(214,69,61,.75)' : 'rgba(26,152,80,.75)') + '"/>';
     }
     g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="#999"/>';
@@ -483,8 +485,11 @@ function renderTrend() {
   if (b) {
     h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%,' + b.lastAbove + ' / ' + b.lastDenom + ')', b.dates,
       [{ vals: b.above20, color: '#2b5d9b', w: 1.4, label: '' }], { refline: 50 });
+    const ns = [...b.net].sort((x, y) => x - y);
+    const q = p => Math.abs(ns[Math.floor(ns.length * p)]);
+    const lim = Math.ceil(Math.max(q(0.03), q(0.97)) / 50) * 50 || 50;
     h += lineChart('52 週淨新高(目前 ' + b.net[b.net.length - 1] + ',NH ' + b.lastNh + ' − NL ' + b.lastNl + ')', b.dates,
-      [{ vals: b.net, color: '#888', label: '' }], { bars: true });
+      [{ vals: b.net, color: '#888', label: '' }], { bars: true, ymin: -lim, ymax: lim });
   }
   box.innerHTML = h || '<p class="sub">尚無指數資料,請先執行 scripts/fetch_index.mjs</p>';
 }
