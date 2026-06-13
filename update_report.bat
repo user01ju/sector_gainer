@@ -25,7 +25,6 @@ git add -A
 git diff --cached --quiet
 if not errorlevel 1 (
   echo No changes to commit.
-  pause
 ) else (
   git commit -m "Daily update (manual)"
   git push
@@ -34,6 +33,7 @@ if not errorlevel 1 (
     pause
   )
 )
+pause
 exit /b 0
 
 
