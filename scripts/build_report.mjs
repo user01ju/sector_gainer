@@ -264,10 +264,12 @@ for (const [id, s] of series) {
   }
 }
 const bCut = Math.max(0, nK - 250);
+const lastK = nK - 1;
 const breadth = {
   dates: keptDates.slice(bCut),
   above20: bAbove.slice(bCut).map((v, i) => bDenom[bCut + i] ? +(v / bDenom[bCut + i] * 100).toFixed(1) : null),
   net: bNh.slice(bCut).map((v, i) => v - bNl[bCut + i]),
+  lastAbove: bAbove[lastK], lastDenom: bDenom[lastK], lastNh: bNh[lastK], lastNl: bNl[lastK],
 };
 
 const report = { date: latestDate, baseDates, market, breadth, sectors };

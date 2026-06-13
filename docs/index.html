@@ -481,9 +481,9 @@ function renderTrend() {
   h += idx(m.taiex, '加權指數') + idx(m.otc, '櫃買指數');
   const b = R.breadth;
   if (b) {
-    h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%)', b.dates,
+    h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%,' + b.lastAbove + ' / ' + b.lastDenom + ')', b.dates,
       [{ vals: b.above20, color: '#2b5d9b', w: 1.4, label: '' }], { refline: 50 });
-    h += lineChart('52 週淨新高(新高 − 新低,目前 ' + b.net[b.net.length - 1] + ')', b.dates,
+    h += lineChart('52 週淨新高(目前 ' + b.net[b.net.length - 1] + ',NH ' + b.lastNh + ' − NL ' + b.lastNl + ')', b.dates,
       [{ vals: b.net, color: '#888', label: '' }], { bars: true });
   }
   box.innerHTML = h || '<p class="sub">尚無指數資料,請先執行 scripts/fetch_index.mjs</p>';
