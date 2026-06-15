@@ -5,59 +5,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>台股類股漲幅報表</title>
 <style>
-  :root { --up:214,69,61; --down:26,152,80; --bg:#fafafa; --line:#e5e5e5; }
+  :root {
+    --bg:#131722; --panel:#1e222d; --panel-alt:#262a35; --border:#2a2e39;
+    --text:#d1d4dc; --text2:#868a96; --text3:#5d616d; --accent:#2962ff;
+    --up:240,92,82; --down:42,193,135;
+    --grid:#252a34; --axis:#787b86; --cline:#d1d4dc; --zero:#434752; --hover:#222732;
+  }
+  body.light {
+    --bg:#eef1f5; --panel:#ffffff; --panel-alt:#f4f6f9; --border:#e0e3eb;
+    --text:#131722; --text2:#6a6d78; --text3:#a3a6af; --accent:#2962ff;
+    --up:214,69,61; --down:26,152,80;
+    --grid:#edf0f4; --axis:#9598a1; --cline:#131722; --zero:#c4c8d0; --hover:#f3f6fb;
+  }
   * { box-sizing:border-box; }
-  body { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; margin:0; background:var(--bg); color:#222; }
-  header { padding:16px 24px 8px; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .sub { color:#777; font-size:12px; }
-  .controls { display:flex; gap:8px; flex-wrap:wrap; padding:8px 24px; align-items:center; }
-  .controls input, .controls select { padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; background:#fff; }
-  .tabs { display:flex; border:1px solid #ccc; border-radius:6px; overflow:hidden; }
-  .tabs button { border:0; background:#fff; padding:7px 14px; font-size:13px; cursor:pointer; border-right:1px solid #ccc; }
-  .tabs button:last-child { border-right:0; }
-  .tabs button.on { background:#2b5d9b; color:#fff; }
-  .view { padding:0 24px 40px; }
-  .tbl-wrap { overflow-x:auto; }
-  table { border-collapse:collapse; width:100%; background:#fff; font-size:13px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-  th, td { padding:6px 9px; border-bottom:1px solid var(--line); white-space:nowrap; }
-  th { background:#f0f0f0; cursor:pointer; user-select:none; position:sticky; top:0; text-align:right; z-index:1; }
+  body { font-family:"Trebuchet MS","Microsoft JhengHei","PingFang TC",-apple-system,system-ui,sans-serif; margin:0; background:var(--bg); color:var(--text); font-size:13px; }
+  header { display:flex; align-items:center; gap:12px; padding:11px 18px; background:var(--panel); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  h1 { font-size:15px; font-weight:600; margin:0; letter-spacing:.2px; }
+  .muted { color:var(--text2); font-size:12px; font-weight:400; }
+  .grow { flex:1; }
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:4px; font-size:12px; font-weight:600; background:var(--panel-alt); margin-left:4px; }
+  .pill .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .icon-btn { background:var(--panel-alt); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:5px 11px; cursor:pointer; font-size:12px; font-family:inherit; }
+  .icon-btn:hover { border-color:var(--accent); }
+  .tabbar { display:flex; gap:2px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--border); overflow-x:auto; }
+  .tabbar button { border:0; background:none; color:var(--text2); padding:10px 15px; font-size:13px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; font-family:inherit; }
+  .tabbar button:hover { color:var(--text); }
+  .tabbar button.on { color:var(--text); border-bottom-color:var(--accent); font-weight:600; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; padding:10px 16px; align-items:center; }
+  input, select { background:var(--panel-alt); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:5px 8px; font-size:12px; font-family:inherit; }
+  input:focus, select:focus { outline:none; border-color:var(--accent); }
+  input::placeholder { color:var(--text3); }
+  .sub { color:var(--text2); font-size:12px; }
+  .view { padding:12px 16px 48px; }
+  .tbl-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:6px; }
+  table { border-collapse:collapse; width:100%; background:var(--panel); font-size:12.5px; }
+  th, td { padding:6px 9px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { background:var(--panel); color:var(--text2); font-weight:500; cursor:pointer; user-select:none; position:sticky; top:0; text-align:right; z-index:1; }
   th:nth-child(-n+3), td:nth-child(-n+3) { text-align:left; }
   th.nosort { cursor:default; }
   td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tbody tr { background:var(--panel); }
   tr.sector { cursor:pointer; }
-  tr.sector:hover td:nth-child(-n+3) { background:#eef4fc; }
-  tr.stock { background:#fcfcfc; color:#444; font-size:12px; }
-  tr.stock td:first-child { padding-left:28px; }
-  .arrow { color:#999; font-size:10px; }
-  .bar { display:inline-block; height:8px; background:#c8d9f0; border-radius:2px; margin-right:6px; vertical-align:middle; }
-  #tmBox { position:relative; height:520px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-  .tile { position:absolute; border:1px solid #fff; border-radius:2px; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; line-height:1.25; }
+  tr.sector:hover td { background:var(--hover); }
+  tr.stock { font-size:12px; color:var(--text2); }
+  tr.stock td { background:var(--bg); }
+  tr.stock td:first-child { padding-left:26px; }
+  tbody tr:last-child td { border-bottom:0; }
+  .arrow { color:var(--text3); font-size:10px; }
+  .bar { display:inline-block; height:8px; background:rgba(41,98,255,.45); border-radius:2px; margin-right:6px; vertical-align:middle; }
+  #tmBox { position:relative; height:520px; background:var(--panel); border:1px solid var(--border); border-radius:6px; }
+  .tile { position:absolute; border:1px solid var(--bg); border-radius:2px; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; line-height:1.25; color:var(--text); }
   .tile span { font-size:12px; white-space:nowrap; }
-  .tile .v { font-size:11px; color:#555; }
-  .crumb { font-size:13px; margin:0 0 8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .crumb button { padding:4px 10px; border:1px solid #ccc; border-radius:6px; background:#fff; cursor:pointer; font-size:12px; }
-  #scBox { background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-  .legend { font-size:12px; color:#777; margin-top:6px; }
+  .tile .v { font-size:11px; opacity:.78; }
+  .crumb { font-size:13px; margin:0 0 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .crumb button { padding:4px 10px; border:1px solid var(--border); border-radius:4px; background:var(--panel-alt); color:var(--text); cursor:pointer; font-size:12px; }
+  #scBox { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px; }
+  .legend { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.6; }
   svg text { font-family:inherit; }
 </style>
 </head>
 <body>
 <header>
-  <h1>台股類股漲幅報表 <span id="hdate" style="font-weight:400;font-size:14px;color:#777;"></span> <span id="lights" style="font-weight:400;font-size:13px;margin-left:10px;"></span></h1>
-  <div class="sub" id="hsub"></div>
+  <h1>台股類股漲幅報表</h1>
+  <span class="muted" id="hdate"></span>
+  <span id="lights"></span>
+  <span class="grow"></span>
+  <button class="icon-btn" id="themeBtn"></button>
 </header>
+<nav class="tabbar" id="tabs">
+  <button data-v="table" class="on">表格</button>
+  <button data-v="map">市場地圖</button>
+  <button data-v="scatter">動能散點</button>
+  <button data-v="scan">突破掃描</button>
+  <button data-v="trend">市場趨勢</button>
+</nav>
 <div class="controls">
-  <div class="tabs" id="tabs">
-    <button data-v="table" class="on">表格</button>
-    <button data-v="map">市場地圖</button>
-    <button data-v="scatter">動能散點</button>
-    <button data-v="scan">突破掃描</button>
-    <button data-v="trend">市場趨勢</button>
-  </div>
   <select id="parentSel"><option value="">全部大類</option></select>
   <input id="search" placeholder="搜尋類股 / 個股代碼名稱" size="22">
   <span class="sub" id="hint"></span>
+  <span class="grow"></span>
+  <span class="sub" id="hsub"></span>
 </div>
 
 <div class="view" id="v-table">
@@ -146,6 +173,22 @@
 <script>
 const R = window.REPORT;
 const METRICS = ['d','w1','m1','m3','m6','m12'];
+
+// ---------- 主題(TradingView 風,深色預設,漲跌沿台股紅漲綠跌)----------
+let TH = {};
+function refreshTheme() {
+  const cs = getComputedStyle(document.body), g = n => cs.getPropertyValue(n).trim();
+  TH = { up: g('--up'), down: g('--down'), panel: g('--panel'), grid: g('--grid'),
+    axis: g('--axis'), text2: g('--text2'), cline: g('--cline'), zero: g('--zero') };
+}
+function setTheme(t) {
+  document.body.className = t;
+  try { localStorage.setItem('sgTheme', t); } catch (e) {}
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '☀ 淺色' : '🌙 深色';
+  refreshTheme();
+  if (window._inited) render();
+}
+document.getElementById('themeBtn').onclick = () => setTheme(document.body.className === 'dark' ? 'light' : 'dark');
 const LBL = { d: '當日%', w1: '1w%', m1: '1m%', m3: '3m%', m6: '6m%', m12: '12m%' };
 const fmt = v => v == null ? '--' : v.toFixed(Math.abs(v) >= 100 ? 0 : 2);
 document.getElementById('hdate').textContent = R.date;
@@ -165,7 +208,7 @@ for (const k of METRICS) {
 function heat(v, scale) {
   if (v == null) return '';
   const a = Math.min(Math.abs(v) / scale, 1) * 0.82;
-  return 'background:rgba(' + (v >= 0 ? '214,69,61' : '26,152,80') + ',' + a.toFixed(3) + ');';
+  return 'background:rgba(' + (v >= 0 ? TH.up : TH.down) + ',' + a.toFixed(3) + ');';
 }
 const cellSec = (v, k) => '<td class="num" style="' + heat(v, SCALE_SEC[k]) + '">' + fmt(v) + '</td>';
 const cellStk = (v, k) => '<td class="num" style="' + heat(v, SCALE_STK[k]) + '">' + fmt(v) + '</td>';
@@ -179,9 +222,9 @@ function sparkSvg(sp) {
   const X = i => pad + i * (w - 2 * pad) / (vals.length - 1);
   const Y = v => pad + (mx - v) * (h - 2 * pad) / rng;
   const pts = vals.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ');
-  const c = vals[vals.length - 1] >= 0 ? 'rgb(214,69,61)' : 'rgb(26,152,80)';
+  const c = vals[vals.length - 1] >= 0 ? 'rgb(' + TH.up + ')' : 'rgb(' + TH.down + ')';
   return '<svg width="' + w + '" height="' + h + '" style="vertical-align:middle;">' +
-    '<line x1="' + pad + '" x2="' + (w - pad) + '" y1="' + Y(0).toFixed(1) + '" y2="' + Y(0).toFixed(1) + '" stroke="#ddd"/>' +
+    '<line x1="' + pad + '" x2="' + (w - pad) + '" y1="' + Y(0).toFixed(1) + '" y2="' + Y(0).toFixed(1) + '" stroke="' + TH.zero + '"/>' +
     '<polyline points="' + pts + '" fill="none" stroke="' + c + '" stroke-width="1.3"/></svg>';
 }
 
@@ -334,22 +377,22 @@ function renderScatter() {
   const maxT = Math.max(...rows.map(s => s.turnover), 1);
   const labelSet = new Set(rows.slice().sort((a, b) => b.turnover - a.turnover).slice(0, 14));
   let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;">';
-  for (const t of niceTicks(xmn, xmx, 8)) g += '<line x1="' + X(t) + '" x2="' + X(t) + '" y1="' + M.t + '" y2="' + (H - M.b) + '" stroke="' + (t === 0 ? '#999' : '#eee') + '"/>' +
-    '<text x="' + X(t) + '" y="' + (H - M.b + 16) + '" font-size="11" fill="#888" text-anchor="middle">' + t + '</text>';
-  for (const t of niceTicks(ymn, ymx, 7)) g += '<line y1="' + Y(t) + '" y2="' + Y(t) + '" x1="' + M.l + '" x2="' + (W - M.r) + '" stroke="' + (t === 0 ? '#999' : '#eee') + '"/>' +
-    '<text x="' + (M.l - 8) + '" y="' + (Y(t) + 4) + '" font-size="11" fill="#888" text-anchor="end">' + t + '</text>';
-  g += '<text x="' + (W - M.r) + '" y="' + (H - M.b - 8) + '" font-size="12" fill="#555" text-anchor="end">' + LBL[kx] + '</text>';
-  g += '<text x="' + (M.l + 8) + '" y="' + (M.t + 12) + '" font-size="12" fill="#555">' + LBL[ky] + '</text>';
+  for (const t of niceTicks(xmn, xmx, 8)) g += '<line x1="' + X(t) + '" x2="' + X(t) + '" y1="' + M.t + '" y2="' + (H - M.b) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
+    '<text x="' + X(t) + '" y="' + (H - M.b + 16) + '" font-size="11" fill="' + TH.axis + '" text-anchor="middle">' + t + '</text>';
+  for (const t of niceTicks(ymn, ymx, 7)) g += '<line y1="' + Y(t) + '" y2="' + Y(t) + '" x1="' + M.l + '" x2="' + (W - M.r) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
+    '<text x="' + (M.l - 8) + '" y="' + (Y(t) + 4) + '" font-size="11" fill="' + TH.axis + '" text-anchor="end">' + t + '</text>';
+  g += '<text x="' + (W - M.r) + '" y="' + (H - M.b - 8) + '" font-size="12" fill="' + TH.text2 + '" text-anchor="end">' + LBL[kx] + '</text>';
+  g += '<text x="' + (M.l + 8) + '" y="' + (M.t + 12) + '" font-size="12" fill="' + TH.text2 + '">' + LBL[ky] + '</text>';
   for (const s of rows.slice().sort((a, b) => b.turnover - a.turnover)) {
     const r = 3 + 17 * Math.sqrt(s.turnover / maxT);
     const a = Math.min(Math.abs(s.d ?? 0) / SCALE_SEC.d, 1) * 0.75 + 0.1;
-    const col = (s.d ?? 0) >= 0 ? '214,69,61' : '26,152,80';
+    const col = (s.d ?? 0) >= 0 ? TH.up : TH.down;
     g += '<circle cx="' + X(s[kx]).toFixed(1) + '" cy="' + Y(s[ky]).toFixed(1) + '" r="' + r.toFixed(1) +
       '" fill="rgba(' + col + ',' + a.toFixed(2) + ')" stroke="rgba(' + col + ',0.9)" stroke-width="0.8">' +
       '<title>' + s.name + '&#10;' + LBL[kx] + ' ' + fmt(s[kx]) + ' / ' + LBL[ky] + ' ' + fmt(s[ky]) +
       '&#10;當日 ' + fmt(s.d) + '% ・ 成交 ' + (s.turnover / 1e8).toFixed(0) + ' 億</title></circle>';
     if (labelSet.has(s)) g += '<text x="' + X(s[kx]).toFixed(1) + '" y="' + (Y(s[ky]) - r - 3).toFixed(1) +
-      '" font-size="11" fill="#444" text-anchor="middle">' + s.name + '</text>';
+      '" font-size="11" fill="' + TH.text2 + '" text-anchor="middle">' + s.name + '</text>';
   }
   g += '</svg>';
   document.getElementById('scBox').innerHTML = g;
@@ -421,12 +464,14 @@ document.querySelectorAll('#v-scan select, #v-scan input').forEach(el => el.onch
 
 // ---------- 大盤燈號 ----------
 const DOT = { green: '🟢', yellow: '🟡', red: '🔴' };
-(function renderLights() {
+const LIGHTCOL = { green: '#26a269', yellow: '#f5a623', red: '#f23645' };
+function renderLights() {
   const m = R.market;
   if (!m) return;
-  const part = (label, s) => s ? label + ' ' + Math.round(s.close[s.close.length - 1]).toLocaleString() + ' ' + DOT[s.light] : '';
-  document.getElementById('lights').textContent = [part('加權', m.taiex), part('櫃買', m.otc)].filter(Boolean).join('  ');
-})();
+  const part = (label, s) => s ? '<span class="pill"><span class="dot" style="background:' + LIGHTCOL[s.light] +
+    '"></span>' + label + ' ' + Math.round(s.close[s.close.length - 1]).toLocaleString() + '</span>' : '';
+  document.getElementById('lights').innerHTML = [part('加權', m.taiex), part('櫃買', m.otc)].filter(Boolean).join('');
+}
 
 // ---------- 市場趨勢 ----------
 function lineChart(title, dates, seriesArr, opts = {}) {
@@ -441,13 +486,13 @@ function lineChart(title, dates, seriesArr, opts = {}) {
   const n = dates.length;
   const X = i => M.l + i * (W - M.l - M.r) / Math.max(1, n - 1);
   const Y = v => H - M.b - (v - mn) / (mx - mn) * (H - M.t - M.b);
-  let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px;">';
-  g += '<text x="' + M.l + '" y="15" font-size="12" fill="#444">' + title + '</text>';
-  for (const t of niceTicks(mn, mx, 4)) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="#f0f0f0"/>' +
-    '<text x="' + (M.l - 6) + '" y="' + (Y(t) + 4) + '" font-size="10" fill="#999" text-anchor="end">' + (Math.abs(t) >= 10000 ? Math.round(t / 1000) + 'k' : +t.toFixed(1)) + '</text>';
+  let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;background:' + TH.panel + ';border:1px solid ' + TH.grid + ';border-radius:6px;margin-bottom:12px;">';
+  g += '<text x="' + M.l + '" y="15" font-size="12" fill="' + TH.text2 + '">' + title + '</text>';
+  for (const t of niceTicks(mn, mx, 4)) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="' + TH.grid + '"/>' +
+    '<text x="' + (M.l - 6) + '" y="' + (Y(t) + 4) + '" font-size="10" fill="' + TH.axis + '" text-anchor="end">' + (Math.abs(t) >= 10000 ? Math.round(t / 1000) + 'k' : +t.toFixed(1)) + '</text>';
   const step = Math.max(1, Math.floor(n / 6));
-  for (let i = 0; i < n; i += step) g += '<text x="' + X(i) + '" y="' + (H - 6) + '" font-size="10" fill="#999" text-anchor="middle">' + dates[i].slice(2, 7) + '</text>';
-  if (opts.refline != null) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(opts.refline) + '" y2="' + Y(opts.refline) + '" stroke="#bbb" stroke-dasharray="4 3"/>';
+  for (let i = 0; i < n; i += step) g += '<text x="' + X(i) + '" y="' + (H - 6) + '" font-size="10" fill="' + TH.axis + '" text-anchor="middle">' + dates[i].slice(2, 7) + '</text>';
+  if (opts.refline != null) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(opts.refline) + '" y2="' + Y(opts.refline) + '" stroke="' + TH.zero + '" stroke-dasharray="4 3"/>';
   if (opts.bars) {
     const bw = Math.max(1, (W - M.l - M.r) / n - 1);
     const s = seriesArr[0];
@@ -455,9 +500,9 @@ function lineChart(title, dates, seriesArr, opts = {}) {
       const v = s.vals[i];
       if (v == null) continue;
       const y0 = Y(0), y1 = Y(clamp(v));
-      g += '<rect x="' + (X(i) - bw / 2) + '" y="' + Math.min(y0, y1) + '" width="' + bw + '" height="' + Math.max(0.5, Math.abs(y0 - y1)) + '" fill="' + (v >= 0 ? 'rgba(214,69,61,.75)' : 'rgba(26,152,80,.75)') + '"/>';
+      g += '<rect x="' + (X(i) - bw / 2) + '" y="' + Math.min(y0, y1) + '" width="' + bw + '" height="' + Math.max(0.5, Math.abs(y0 - y1)) + '" fill="rgba(' + (v >= 0 ? TH.up : TH.down) + ',.8)"/>';
     }
-    g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="#999"/>';
+    g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="' + TH.axis + '"/>';
   } else {
     for (const s of seriesArr) {
       const pts = [];
@@ -477,14 +522,14 @@ function renderTrend() {
   let h = '';
   const m = R.market || {};
   const idx = (s, name) => s ? lineChart(name + ' ' + DOT[s.light], s.dates,
-    [{ vals: s.close, color: '#222', w: 1.4, label: '收盤' },
-     { vals: s.ma10, color: '#d6453d', label: 'MA10' },
-     { vals: s.ma20, color: '#2b5d9b', label: 'MA20' }]) : '';
+    [{ vals: s.close, color: TH.cline, w: 1.4, label: '收盤' },
+     { vals: s.ma10, color: '#ff9800', label: 'MA10' },
+     { vals: s.ma20, color: '#2962ff', label: 'MA20' }]) : '';
   h += idx(m.taiex, '加權指數') + idx(m.otc, '櫃買指數');
   const b = R.breadth;
   if (b) {
     h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%,' + b.lastAbove + ' / ' + b.lastDenom + ')', b.dates,
-      [{ vals: b.above20, color: '#2b5d9b', w: 1.4, label: '' }], { refline: 50 });
+      [{ vals: b.above20, color: '#2962ff', w: 1.4, label: '' }], { refline: 50 });
     const ns = [...b.net].sort((x, y) => x - y);
     const q = p => Math.abs(ns[Math.floor(ns.length * p)]);
     const lim = Math.ceil(Math.max(q(0.03), q(0.97)) / 50) * 50 || 50;
@@ -520,6 +565,12 @@ document.getElementById('tabs').onclick = e => {
 document.getElementById('parentSel').onchange = () => { tmSector = null; render(); };
 document.getElementById('search').oninput = render;
 let rsz; window.onresize = () => { clearTimeout(rsz); rsz = setTimeout(() => { if (view === 'map') renderMap(); }, 150); };
+
+renderLights();
+let saved = 'dark';
+try { saved = localStorage.getItem('sgTheme') || 'dark'; } catch (e) {}
+setTheme(saved);
+window._inited = true;
 render();
 </script>
 </body>
