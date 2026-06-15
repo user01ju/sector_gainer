@@ -33,7 +33,7 @@ if not errorlevel 1 (
     pause
   )
 )
-pause
+::pause
 exit /b 0
 
 
