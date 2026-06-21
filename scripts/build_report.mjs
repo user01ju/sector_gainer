@@ -136,6 +136,11 @@ function stockMetrics(id) {
 // ---------- aggregate ----------
 const categories = JSON.parse(readFileSync(join(ROOT, 'data', 'categories.json'), 'utf8'));
 
+// 排除創新板(-創 / -KY創):漲跌幅與流動性制度不同、投機性高,單檔妖股會用爆量搶到高
+// 成交金額權重、再乘以天文數字漲幅,污染整個類股(如 7610 聯友金屬-創曾把鋼鐵 6m 帶到 +604%)。
+const INNOVATION = /(-創|KY創)$/;
+for (const c of categories) c.stocks = c.stocks.filter(s => !INNOVATION.test(s.name));
+
 // 個股還原指數在 idx(含)以前最近一筆
 function cumAt(id, idx) {
   const s = series.get(id);
