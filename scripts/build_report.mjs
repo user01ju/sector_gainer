@@ -12,7 +12,6 @@ import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DAILY = join(ROOT, 'data', 'daily');
-const PAGES_URL = 'https://user01ju.github.io/sector_gainer/';
 
 // ---------- load ----------
 const exrights = new Map();
@@ -290,7 +289,7 @@ writeFileSync(join(ROOT, 'README.md'), `# 台股類股漲幅報表
 
 更新日期:**${latestDate}**(每個交易日自動更新)
 
-👉 **[互動版報表](${PAGES_URL})** — 可排序、搜尋、展開成份股
+👉 **互動報表**:執行 \`update_report.bat\`(會自動開啟),或直接用瀏覽器開 \`docs/index.html\`
 
 - 子類股漲幅 = 成份股漲幅以**當日成交金額占比**加權
 - 還原權息;1w = 7 日曆天前,1m/3m/6m/12m = 日曆月回推,取最近交易日
