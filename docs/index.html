@@ -148,8 +148,8 @@
     <label class="filt" id="lblD">|當日| ≤ <input type="number" id="scD" value="5" style="width:42px">%</label>
     <label class="filt" id="lblBrk" style="display:none;">突破日 ≥ <input type="number" id="scBrk" value="4" style="width:42px">%</label>
     <label class="filt">量 ≥ <input type="number" id="scVol" value="3" style="width:46px">億/日</label>
-    <label class="filt">ADR ≥ <input type="number" id="scAdr" value="2.5" step="0.5" style="width:48px">%</label>
-    <label class="filt">距高 ≤ <input type="number" id="scOff" value="25" style="width:46px">%</label>
+    <label class="filt">ADR ≥ <input type="number" id="scAdr" value="4" step="0.5" style="width:48px">%</label>
+    <label class="filt">距高 ≤ <input type="number" id="scOff" value="30" style="width:46px">%</label>
     <label class="filt">量縮 ≤ <input type="number" id="scVq" step="0.1" placeholder="不限" style="width:50px"></label>
     <span class="sub" id="scanCount" style="font-weight:600;"></span>
   </div>
@@ -468,6 +468,12 @@ document.querySelectorAll('#scanTbl th[data-sk]').forEach(th => th.onclick = () 
   renderScan();
 });
 document.querySelectorAll('#v-scan select, #v-scan input').forEach(el => el.onchange = renderScan);
+// 切換動能尺度時自動帶入該尺度的常用門檻
+const MOMO_DEF = { m1: 30, m3: 50, m6: 100 };
+document.getElementById('scMomoK').onchange = () => {
+  document.getElementById('scMomo').value = MOMO_DEF[document.getElementById('scMomoK').value];
+  renderScan();
+};
 
 // ---------- 大盤燈號 ----------
 const DOT = { green: '🟢', yellow: '🟡', red: '🔴' };
