@@ -57,7 +57,10 @@
   .tile { position:absolute; border:1px solid var(--bg); border-radius:2px; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; line-height:1.25; color:var(--text); }
   .tile span { font-size:12px; white-space:nowrap; }
   .tile .v { font-size:11px; opacity:.78; }
-  .crumb { font-size:13px; margin:0 0 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .crumb { font-size:13px; margin:0 0 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .filt { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; background:var(--panel); border:1px solid var(--border); border-radius:6px; font-size:12px; color:var(--text2); white-space:nowrap; }
+  .filt select, .filt input { background:var(--panel-alt); padding:3px 6px; }
+  .filt.mode { border-color:var(--accent); color:var(--text); }
   .crumb button { padding:4px 10px; border:1px solid var(--border); border-radius:4px; background:var(--panel-alt); color:var(--text); cursor:pointer; font-size:12px; }
   #scBox { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px; }
   .legend { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.6; }
@@ -132,20 +135,22 @@
 </div>
 
 <div class="view" id="v-scan" style="display:none;">
-  <div class="crumb" style="gap:14px;">
-    <label class="sub">模式:<select id="scanMode">
+  <div class="crumb">
+    <label class="filt mode">模式 <select id="scanMode">
       <option value="flag">收縮中(watchlist)</option>
       <option value="brk">今日突破</option>
       <option value="momo">全部動能股</option>
     </select></label>
-    <label class="sub">1m ≥ <input type="number" id="scM1" value="25" style="width:52px"> 或 3m ≥ <input type="number" id="scM3" value="50" style="width:52px"> %</label>
-    <label class="sub" id="lblW1"><span id="w1tag">1w</span> <input type="number" id="scW1lo" value="-12" style="width:52px"> ~ <input type="number" id="scW1hi" value="5" style="width:52px"> %</label>
-    <label class="sub" id="lblD">|當日| ≤ <input type="number" id="scD" value="5" style="width:46px"> %</label>
-    <label class="sub" id="lblBrk" style="display:none;">突破日 ≥ <input type="number" id="scBrk" value="4" style="width:46px"> %</label>
-    <label class="sub">量 ≥ <input type="number" id="scVol" value="3" style="width:50px"> 億</label>
-    <label class="sub">ADR ≥ <input type="number" id="scAdr" value="2.5" step="0.5" style="width:52px"> %</label>
-    <label class="sub">距高 ≤ <input type="number" id="scOff" value="25" style="width:50px"> %</label>
-    <label class="sub">量縮 ≤ <input type="number" id="scVq" step="0.1" placeholder="不限" style="width:54px"></label>
+    <label class="filt">動能腿 <select id="scMomoK">
+      <option value="m1">1m</option><option value="m3" selected>3m</option><option value="m6">6m</option>
+    </select> ≥ <input type="number" id="scMomo" value="50" style="width:50px">%</label>
+    <label class="filt" id="lblW1"><span id="w1tag">1w</span> <input type="number" id="scW1lo" value="-12" style="width:48px"> ~ <input type="number" id="scW1hi" value="5" style="width:44px">%</label>
+    <label class="filt" id="lblD">|當日| ≤ <input type="number" id="scD" value="5" style="width:42px">%</label>
+    <label class="filt" id="lblBrk" style="display:none;">突破日 ≥ <input type="number" id="scBrk" value="4" style="width:42px">%</label>
+    <label class="filt">量 ≥ <input type="number" id="scVol" value="3" style="width:46px">億</label>
+    <label class="filt">ADR ≥ <input type="number" id="scAdr" value="2.5" step="0.5" style="width:48px">%</label>
+    <label class="filt">距高 ≤ <input type="number" id="scOff" value="25" style="width:46px">%</label>
+    <label class="filt">量縮 ≤ <input type="number" id="scVq" step="0.1" placeholder="不限" style="width:50px"></label>
     <span class="sub" id="scanCount" style="font-weight:600;"></span>
   </div>
   <div class="tbl-wrap">
@@ -418,11 +423,11 @@ function renderScan() {
   document.getElementById('lblW1').style.display = mode === 'momo' ? 'none' : '';
   document.getElementById('w1tag').textContent = mode === 'brk' ? '前5日(不含今日)' : '1w';
   const q = document.getElementById('search').value.trim().toLowerCase();
-  const M1 = scanVal('scM1'), M3 = scanVal('scM3'), W1lo = scanVal('scW1lo'), W1hi = scanVal('scW1hi');
+  const MK = document.getElementById('scMomoK').value, MV = scanVal('scMomo'), W1lo = scanVal('scW1lo'), W1hi = scanVal('scW1hi');
   const Dmax = scanVal('scD'), BRK = scanVal('scBrk'), VOL = scanVal('scVol') * 1e8, ADR = scanVal('scAdr'), OFF = scanVal('scOff');
   let rows = SC.filter(x => {
     if (q && !(x.id.includes(q) || x.name.toLowerCase().includes(q) || x.sec.toLowerCase().includes(q))) return false;
-    if (!((x.m1 != null && x.m1 >= M1) || (x.m3 != null && x.m3 >= M3))) return false;
+    if (x[MK] == null || x[MK] < MV) return false;
     if (x.turnover < VOL) return false;
     if (ADR > 0 && (x.adr == null || x.adr < ADR)) return false;
     if (x.off == null || x.off < -OFF) return false;
