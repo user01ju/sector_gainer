@@ -139,7 +139,7 @@
       <option value="momo">全部動能股</option>
     </select></label>
     <label class="sub">1m ≥ <input type="number" id="scM1" value="25" style="width:52px"> 或 3m ≥ <input type="number" id="scM3" value="50" style="width:52px"> %</label>
-    <label class="sub" id="lblW1">1w <input type="number" id="scW1lo" value="-12" style="width:52px"> ~ <input type="number" id="scW1hi" value="5" style="width:52px"> %</label>
+    <label class="sub" id="lblW1"><span id="w1tag">1w</span> <input type="number" id="scW1lo" value="-12" style="width:52px"> ~ <input type="number" id="scW1hi" value="5" style="width:52px"> %</label>
     <label class="sub" id="lblD">|當日| ≤ <input type="number" id="scD" value="5" style="width:46px"> %</label>
     <label class="sub" id="lblBrk" style="display:none;">突破日 ≥ <input type="number" id="scBrk" value="4" style="width:46px"> %</label>
     <label class="sub">量 ≥ <input type="number" id="scVol" value="3" style="width:50px"> 億</label>
@@ -415,6 +415,8 @@ function renderScan() {
   const mode = document.getElementById('scanMode').value;
   document.getElementById('lblD').style.display = mode === 'flag' ? '' : 'none';
   document.getElementById('lblBrk').style.display = mode === 'brk' ? '' : 'none';
+  document.getElementById('lblW1').style.display = mode === 'momo' ? 'none' : '';
+  document.getElementById('w1tag').textContent = mode === 'brk' ? '前5日(不含今日)' : '1w';
   const q = document.getElementById('search').value.trim().toLowerCase();
   const M1 = scanVal('scM1'), M3 = scanVal('scM3'), W1lo = scanVal('scW1lo'), W1hi = scanVal('scW1hi');
   const Dmax = scanVal('scD'), BRK = scanVal('scBrk'), VOL = scanVal('scVol') * 1e8, ADR = scanVal('scAdr'), OFF = scanVal('scOff');
