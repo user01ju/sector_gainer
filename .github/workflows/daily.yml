@@ -2,8 +2,9 @@ name: Daily update
 
 on:
   schedule:
-    # 18:00 台北時間(盤後資料已齊),週一~週五
-    - cron: '0 10 * * 1-5'
+    # 台北 15:05 / 16:05 / 17:05 / 18:05(UTC+8),週一~五
+    # 盤後資料齊全時間不定,跑多次;fetch 對未齊的當天不寫檔,留待下一輪補抓
+    - cron: '5 7-10 * * 1-5'
   workflow_dispatch:
 
 permissions:
