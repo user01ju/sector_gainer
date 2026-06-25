@@ -532,24 +532,59 @@ function lineChart(title, dates, seriesArr, opts = {}) {
 }
 function renderTrend() {
   const box = document.getElementById('trendBox');
+  box.style.position = 'relative';
   let h = '';
   const m = R.market || {};
-  const idx = (s, name) => s ? lineChart(name + ' ' + DOT[s.light], s.dates,
-    [{ vals: s.close, color: TH.cline, w: 1.4, label: '收盤' },
-     { vals: s.ma10, color: '#ff9800', label: 'MA10' },
-     { vals: s.ma20, color: '#2962ff', label: 'MA20' }]) : '';
-  h += idx(m.taiex, '加權指數') + idx(m.otc, '櫃買指數');
+  const lines = [];  // crosshair tooltip 用(由上到下對應各圖)
+  const idx = (s, name) => {
+    if (!s) return '';
+    lines.push({ label: name.replace('指數', ''), vals: s.close, fmt: v => Math.round(v).toLocaleString() });
+    return lineChart(name + ' ' + DOT[s.light], s.dates,
+      [{ vals: s.close, color: TH.cline, w: 1.4, label: '收盤' },
+       { vals: s.ma10, color: '#ff9800', label: 'MA10' },
+       { vals: s.ma20, color: '#2962ff', label: 'MA20' }]);
+  };
+  // 順序:櫃買 → 加權 → >20MA → 淨新高(由用戶指定,方便一起判讀)
+  h += idx(m.otc, '櫃買指數') + idx(m.taiex, '加權指數');
   const b = R.breadth;
   if (b) {
     h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%,' + b.lastAbove + ' / ' + b.lastDenom + ')', b.dates,
       [{ vals: b.above20, color: '#2962ff', w: 1.4, label: '' }], { refline: 50 });
+    lines.push({ label: '>20MA', vals: b.above20, fmt: v => v + '%' });
     const ns = [...b.net].sort((x, y) => x - y);
     const q = p => Math.abs(ns[Math.floor(ns.length * p)]);
     const lim = Math.ceil(Math.max(q(0.03), q(0.97)) / 50) * 50 || 50;
     h += lineChart('52 週淨新高(目前 ' + b.net[b.net.length - 1] + ',NH ' + b.lastNh + ' − NL ' + b.lastNl + ')', b.dates,
       [{ vals: b.net, color: '#888', label: '' }], { bars: true, ymin: -lim, ymax: lim });
+    lines.push({ label: '淨新高', vals: b.net, fmt: v => '' + v });
   }
   box.innerHTML = h || '<p class="sub">尚無指數資料,請先執行 scripts/fetch_index.mjs</p>';
+
+  // 跨圖滑鼠對齊線(四圖共用主軸,同一 x 像素對應同一日)
+  const axis = (b && b.dates) || ((m.taiex || m.otc || {}).dates) || [];
+  if (axis.length) {
+    const N = axis.length, CW = 980, ML = 56, MR = 12;
+    const hair = document.createElement('div');
+    hair.style.cssText = 'position:absolute;top:0;bottom:0;width:1px;background:var(--accent);opacity:.65;pointer-events:none;display:none;z-index:5;';
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:absolute;pointer-events:none;display:none;z-index:6;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:11px;line-height:1.5;color:var(--text);white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.35);';
+    box.appendChild(hair); box.appendChild(tip);
+    box.onmousemove = e => {
+      const svg = box.querySelector('svg'); if (!svg) return;
+      const r = svg.getBoundingClientRect(), boxR = box.getBoundingClientRect();
+      let i = Math.round(((e.clientX - r.left) / r.width * CW - ML) / ((CW - ML - MR) / (N - 1)));
+      i = Math.max(0, Math.min(N - 1, i));
+      const px = (r.left - boxR.left) + (ML + i * (CW - ML - MR) / (N - 1)) / CW * r.width;
+      hair.style.left = px + 'px'; hair.style.display = 'block';
+      let html = '<b>' + axis[i] + '</b>';
+      for (const ln of lines) { const v = ln.vals[i]; html += '<br>' + ln.label + ' ' + (v == null ? '--' : ln.fmt(v)); }
+      tip.innerHTML = html;
+      let tx = e.clientX - boxR.left + 14;
+      if (tx > boxR.width - 120) tx = e.clientX - boxR.left - 110;
+      tip.style.left = tx + 'px'; tip.style.top = (e.clientY - boxR.top + 12) + 'px'; tip.style.display = 'block';
+    };
+    box.onmouseleave = () => { hair.style.display = 'none'; tip.style.display = 'none'; };
+  }
 }
 
 // ---------- 共用 ----------

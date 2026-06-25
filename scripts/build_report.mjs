@@ -219,29 +219,6 @@ const sectors = categories.map(cat => {
 for (const s of sectors) for (const k of METRICS) if (s[k] != null) s[k] = +s[k].toFixed(2);
 sectors.sort((a, b) => (b.d ?? -999) - (a.d ?? -999));
 
-// ---------- 大盤指數與紅綠燈 ----------
-let market = null;
-const idxFile = join(ROOT, 'data', 'market_index.csv');
-if (existsSync(idxFile)) {
-  const rows = readFileSync(idxFile, 'utf8').split('\n').slice(1)
-    .map(l => l.split(','))
-    .filter(r => r[0] && r[0] <= latestDate)
-    .map(r => ({ date: r[0], taiex: r[1] ? +r[1] : null, otc: r[2] ? +r[2] : null }));
-  const idxSeries = key => {
-    const pts = rows.filter(r => r[key] != null);
-    if (pts.length < 21) return null;
-    const vals = pts.map(p => p[key]);
-    const maN = n => vals.map((_, i) => i + 1 >= n ? +(vals.slice(i + 1 - n, i + 1).reduce((a, b) => a + b, 0) / n).toFixed(2) : null);
-    const ma10 = maN(10), ma20 = maN(20);
-    const c = vals[vals.length - 1], m10 = ma10[ma10.length - 1], m20 = ma20[ma20.length - 1];
-    const light = c > m10 && c > m20 ? 'green' : c < m10 && c < m20 ? 'red' : 'yellow';
-    const cut = Math.max(0, vals.length - 250);
-    return { dates: pts.slice(cut).map(p => p.date), close: vals.slice(cut), ma10: ma10.slice(cut), ma20: ma20.slice(cut), light };
-  };
-  const taiex = idxSeries('taiex'), otc = idxSeries('otc');
-  if (taiex || otc) market = { taiex, otc };
-}
-
 // ---------- 市場廣度:收盤 > 20MA 比例、52w 淨新高(還原序列,上市滿半年才計新高低) ----------
 const keptOrd = new Array(files.length).fill(-1);
 { let o = 0; for (let i = 0; i < files.length; i++) if (!dropped[i]) keptOrd[i] = o++; }
@@ -275,6 +252,33 @@ const breadth = {
   net: bNh.slice(bCut).map((v, i) => v - bNl[bCut + i]),
   lastAbove: bAbove[lastK], lastDenom: bDenom[lastK], lastNh: bNh[lastK], lastNl: bNl[lastK],
 };
+
+// ---------- 大盤指數與紅綠燈(對齊 breadth.dates 主軸,讓四張趨勢圖共用 x 軸) ----------
+let market = null;
+const idxFile = join(ROOT, 'data', 'market_index.csv');
+if (existsSync(idxFile)) {
+  const irows = readFileSync(idxFile, 'utf8').split('\n').slice(1)
+    .map(l => l.split(','))
+    .filter(r => r[0] && r[0] <= latestDate)
+    .map(r => ({ date: r[0], taiex: r[1] ? +r[1] : null, otc: r[2] ? +r[2] : null }));
+  const axis = breadth.dates;
+  const idxSeries = key => {
+    const pts = irows.filter(r => r[key] != null);
+    if (pts.length < 21) return null;
+    const vals = pts.map(p => p[key]);
+    const maN = n => vals.map((_, i) => i + 1 >= n ? +(vals.slice(i + 1 - n, i + 1).reduce((a, b) => a + b, 0) / n).toFixed(2) : null);
+    const ma10 = maN(10), ma20 = maN(20);
+    const c = vals[vals.length - 1], m10 = ma10[ma10.length - 1], m20 = ma20[ma20.length - 1];
+    const light = c > m10 && c > m20 ? 'green' : c < m10 && c < m20 ? 'red' : 'yellow';
+    // 以日期 map 對齊主軸,缺值補 null(誠實呈現斷點,不連直線)
+    const vm = new Map(pts.map((p, i) => [p.date, [vals[i], ma10[i], ma20[i]]]));
+    const close = [], ma10a = [], ma20a = [];
+    for (const d of axis) { const v = vm.get(d); close.push(v ? v[0] : null); ma10a.push(v ? v[1] : null); ma20a.push(v ? v[2] : null); }
+    return { dates: axis, close, ma10: ma10a, ma20: ma20a, light };
+  };
+  const taiex = idxSeries('taiex'), otc = idxSeries('otc');
+  if (taiex || otc) market = { taiex, otc };
+}
 
 const report = { date: latestDate, baseDates, market, breadth, sectors };
 writeFileSync(join(ROOT, 'docs', 'report.json'), JSON.stringify(report), 'utf8');
