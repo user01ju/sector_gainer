@@ -169,6 +169,12 @@
 </div>
 
 <div class="view" id="v-trend" style="display:none;">
+  <div class="crumb">
+    <label class="filt mode">範圍 <select id="trendRange">
+      <option value="126">近 6 個月</option>
+      <option value="9999" selected>近 1 年</option>
+    </select></label>
+  </div>
   <div id="trendBox"></div>
   <div class="legend">燈號:🟢 收盤站上 MA10 與 MA20(正常進攻)・🟡 介於兩線之間(只持有不加倉)・🔴 雙雙跌破(防守/空手)。廣度與新高新低以還原序列計,上市滿半年才列入新高低統計。</div>
 </div>
@@ -534,7 +540,12 @@ function renderTrend() {
   const box = document.getElementById('trendBox');
   box.style.position = 'relative';
   let h = '';
-  const m = R.market || {};
+  // 時間範圍切片(6m=126 交易日 / 1Y=全部),純前端取主軸尾段
+  const N = +(document.getElementById('trendRange') || { value: 9999 }).value;
+  const cut = a => (a && N < a.length) ? a.slice(a.length - N) : a;
+  const sub = s => s ? { dates: cut(s.dates), close: cut(s.close), ma10: cut(s.ma10), ma20: cut(s.ma20), light: s.light } : null;
+  const m0 = R.market || {};
+  const m = { taiex: sub(m0.taiex), otc: sub(m0.otc) };
   const lines = [];  // crosshair tooltip 用(由上到下對應各圖)
   const idx = (s, name) => {
     if (!s) return '';
@@ -546,7 +557,8 @@ function renderTrend() {
   };
   // 順序:櫃買 → 加權 → >20MA → 淨新高(由用戶指定,方便一起判讀)
   h += idx(m.otc, '櫃買指數') + idx(m.taiex, '加權指數');
-  const b = R.breadth;
+  const b0 = R.breadth;
+  const b = b0 ? { ...b0, dates: cut(b0.dates), above20: cut(b0.above20), net: cut(b0.net) } : null;
   if (b) {
     h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%,' + b.lastAbove + ' / ' + b.lastDenom + ')', b.dates,
       [{ vals: b.above20, color: '#2962ff', w: 1.4, label: '' }], { refline: 50 });
@@ -612,6 +624,7 @@ document.getElementById('tabs').onclick = e => {
 });
 document.getElementById('parentSel').onchange = () => { tmSector = null; render(); };
 document.getElementById('search').oninput = render;
+document.getElementById('trendRange').onchange = renderTrend;
 let rsz; window.onresize = () => { clearTimeout(rsz); rsz = setTimeout(() => { if (view === 'map') renderMap(); }, 150); };
 
 renderLights();
