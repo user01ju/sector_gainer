@@ -1,6 +1,13 @@
 @echo off
 cd /d "%~dp0"
 
+echo === [0/5] Sync with remote (CI also commits data) ===
+git pull --ff-only
+if errorlevel 1 (
+  echo *** local diverged from remote - resolve manually before running ***
+  goto :fail
+)
+
 echo === [1/5] Fetch daily quotes (last 7 days, skip existing/holidays) ===
 node scripts\fetch_daily.mjs --backfill 7
 if errorlevel 1 goto :fail
