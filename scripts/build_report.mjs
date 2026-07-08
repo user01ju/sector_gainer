@@ -26,14 +26,18 @@ const files = readdirSync(DAILY).filter(f => /^\d{4}-\d{2}-\d{2}\.csv$/.test(f))
 if (!files.length) { console.error('no daily data'); process.exit(1); }
 const dates = files.map(f => f.slice(0, 10));
 
+const marketOf = new Map(); // id -> TWSE/TPEX(以最新出現日為準,轉板取新)
 function loadDay(f) {
   const map = new Map();
   for (const ln of readFileSync(join(DAILY, f), 'utf8').split('\n').slice(1)) {
-    const [id, , , close, change, turnover, high, low] = ln.split(',');
-    if (id) map.set(id, {
-      close: +close, change: change === '' ? null : +change, turnover: +turnover,
-      high: high ? +high : null, low: low ? +low : null,
-    });
+    const [id, , market, close, change, turnover, high, low] = ln.split(',');
+    if (id) {
+      map.set(id, {
+        close: +close, change: change === '' ? null : +change, turnover: +turnover,
+        high: high ? +high : null, low: low ? +low : null,
+      });
+      if (market) marketOf.set(id, market);
+    }
   }
   return map;
 }
@@ -208,7 +212,7 @@ const sectors = categories.map(cat => {
     spark: sparkOf(stocks),
     ...agg,
     stocks: stocks.map(x => ({
-      id: x.id, name: x.name, close: x.close,
+      id: x.id, name: x.name, market: marketOf.get(x.id) ?? null, close: x.close,
       weight: +(x.weight * 100).toFixed(2),
       turnover: x.turnover,
       ...Object.fromEntries(METRICS.map(k => [k, x[k] == null ? null : +x[k].toFixed(2)])),

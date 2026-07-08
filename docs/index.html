@@ -53,6 +53,11 @@
   tbody tr:last-child td { border-bottom:0; }
   .arrow { color:var(--text3); font-size:10px; }
   .bar { display:inline-block; height:8px; background:rgba(41,98,255,.45); border-radius:2px; margin-right:6px; vertical-align:middle; }
+  .tvbtn { border:1px solid var(--border); background:var(--panel-alt); color:var(--text2); border-radius:4px; font-size:10.5px; padding:1px 6px; cursor:pointer; margin-left:6px; font-family:inherit; }
+  .tvbtn:hover { color:var(--text); border-color:var(--accent); }
+  .ck { vertical-align:middle; margin-right:6px; cursor:pointer; accent-color:var(--accent); }
+  #tvExport { display:none; border:1px solid var(--accent); background:var(--panel-alt); color:var(--text); border-radius:4px; padding:5px 10px; font-size:12px; cursor:pointer; font-family:inherit; }
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--panel-alt); border:1px solid var(--accent); color:var(--text); padding:8px 16px; border-radius:6px; font-size:12.5px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:99; }
   #tmBox { position:relative; height:520px; background:var(--panel); border:1px solid var(--border); border-radius:6px; }
   .tile { position:absolute; border:1px solid var(--bg); border-radius:2px; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; line-height:1.25; color:var(--text); }
   .tile span { font-size:12px; white-space:nowrap; }
@@ -85,6 +90,7 @@
 <div class="controls">
   <select id="parentSel"><option value="">全部大類</option></select>
   <input id="search" placeholder="搜尋類股 / 個股代碼名稱" size="22">
+  <button id="tvExport"></button>
   <span class="sub" id="hint"></span>
   <span class="grow"></span>
   <span class="sub" id="hsub"></span>
@@ -179,6 +185,7 @@
   <div class="legend">燈號:🟢 收盤站上 MA10 與 MA20(正常進攻)・🟡 介於兩線之間(只持有不加倉)・🔴 雙雙跌破(防守/空手)。廣度與新高新低以還原序列計,上市滿半年才列入新高低統計。</div>
 </div>
 
+<div id="toast"></div>
 <script src="data.js"></script>
 <script src="scanner.js"></script>
 <script>
@@ -249,6 +256,36 @@ function filtered() {
   return rows;
 }
 
+// ---------- TradingView 匯出 ----------
+const tvChecked = new Set();
+const sectorByKey = k => R.sectors.find(s => s.parent + '|' + s.name === k);
+const tvSym = x => (x.market === 'TPEX' ? 'TPEX:' : 'TWSE:') + x.id;
+const tvListOf = secs => secs.map(s => '###' + s.name + ',' + s.stocks.map(tvSym).join(',')).join(',');
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = 1;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.opacity = 0, 2600);
+}
+function exportTv(secs) {
+  secs = secs.filter(Boolean);
+  if (!secs.length) return;
+  const txt = tvListOf(secs);
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(() => {});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
+  a.download = 'tv_' + R.date + '_' + (secs.length === 1 ? secs[0].name : secs.length + '類股') + '.txt';
+  a.click(); URL.revokeObjectURL(a.href);
+  const n = secs.reduce((a2, s) => a2 + s.stocks.length, 0);
+  toast('已複製 + 下載 TV 清單:' + secs.length + ' 類股 ' + n + ' 檔');
+}
+function updateTvBtn() {
+  const b = document.getElementById('tvExport');
+  b.style.display = tvChecked.size ? '' : 'none';
+  b.textContent = '匯出 TV 清單 (' + tvChecked.size + ')';
+}
+document.getElementById('tvExport').onclick = () => exportTv([...tvChecked].map(sectorByKey));
+
 // ---------- 表格 ----------
 let sortKey = 'd', sortDir = -1, expanded = new Set();
 function updateSortMarks() {
@@ -268,8 +305,9 @@ function renderTable() {
     const key = s.parent + '|' + s.name;
     const open = expanded.has(key);
     let h = '<tr class="sector" data-key="' + key + '">' +
-      '<td>' + s.parent + '</td>' +
-      '<td><span class="arrow">' + (open ? '▼' : '▶') + '</span> ' + s.name + '</td>' +
+      '<td><input type="checkbox" class="ck" data-key="' + key + '"' + (tvChecked.has(key) ? ' checked' : '') + '>' + s.parent + '</td>' +
+      '<td><span class="arrow">' + (open ? '▼' : '▶') + '</span> ' + s.name +
+      '<button class="tvbtn" data-tv="' + key + '" title="匯出 TradingView 清單">TV</button></td>' +
       '<td class="num">' + s.count + '</td>' +
       '<td class="num">' + (s.turnover / 1e8).toFixed(1) + '</td>' +
       METRICS.map(k => cellSec(s[k], k)).join('') +
@@ -291,6 +329,15 @@ document.querySelectorAll('#tbl th[data-k]').forEach(th => th.onclick = () => {
   renderTable();
 });
 document.querySelector('#tbl tbody').onclick = e => {
+  if (e.target.classList.contains('ck')) {
+    e.target.checked ? tvChecked.add(e.target.dataset.key) : tvChecked.delete(e.target.dataset.key);
+    updateTvBtn();
+    return;
+  }
+  if (e.target.classList.contains('tvbtn')) {
+    exportTv([sectorByKey(e.target.dataset.tv)]);
+    return;
+  }
   const tr = e.target.closest('tr.sector');
   if (!tr) return;
   expanded.has(tr.dataset.key) ? expanded.delete(tr.dataset.key) : expanded.add(tr.dataset.key);
