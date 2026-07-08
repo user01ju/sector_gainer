@@ -268,16 +268,30 @@ function toast(msg) {
   t.textContent = msg; t.style.opacity = 1;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.opacity = 0, 2600);
 }
-function exportTv(secs) {
+async function exportTv(secs) {
   secs = secs.filter(Boolean);
   if (!secs.length) return;
   const txt = tvListOf(secs);
+  const n = secs.reduce((a2, s) => a2 + s.stocks.length, 0);
+  // 先試本機 tv_push helper(tv_serve.py)直推;沒開/失敗 → fallback 複製+下載
+  try {
+    const ctl = new AbortController();
+    const tid = setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch('http://127.0.0.1:5177/push', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '族群匯入', symbols: txt.split(',') }),
+      signal: ctl.signal,
+    });
+    clearTimeout(tid);
+    const j = await r.json();
+    if (j.ok) { toast('已直推 TV「族群匯入」:' + secs.length + ' 類股 ' + n + ' 檔'); return; }
+    toast('直推失敗(' + (j.err || '?') + '),改用複製+下載');
+  } catch (e) { /* helper 未開,走 fallback */ }
   if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(() => {});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
   a.download = 'tv_' + R.date + '_' + (secs.length === 1 ? secs[0].name : secs.length + '類股') + '.txt';
   a.click(); URL.revokeObjectURL(a.href);
-  const n = secs.reduce((a2, s) => a2 + s.stocks.length, 0);
   toast('已複製 + 下載 TV 清單:' + secs.length + ' 類股 ' + n + ' 檔');
 }
 function updateTvBtn() {
