@@ -271,14 +271,14 @@ if (existsSync(idxFile)) {
     if (pts.length < 21) return null;
     const vals = pts.map(p => p[key]);
     const maN = n => vals.map((_, i) => i + 1 >= n ? +(vals.slice(i + 1 - n, i + 1).reduce((a, b) => a + b, 0) / n).toFixed(2) : null);
-    const ma10 = maN(10), ma20 = maN(20);
-    const c = vals[vals.length - 1], m10 = ma10[ma10.length - 1], m20 = ma20[ma20.length - 1];
-    const light = c > m10 && c > m20 ? 'green' : c < m10 && c < m20 ? 'red' : 'yellow';
+    const ma3 = maN(3), ma9 = maN(9);
+    const m3 = ma3[ma3.length - 1], m9 = ma9[ma9.length - 1];
+    const light = m3 > m9 ? 'green' : 'red';
     // 以日期 map 對齊主軸,缺值補 null(誠實呈現斷點,不連直線)
-    const vm = new Map(pts.map((p, i) => [p.date, [vals[i], ma10[i], ma20[i]]]));
-    const close = [], ma10a = [], ma20a = [];
-    for (const d of axis) { const v = vm.get(d); close.push(v ? v[0] : null); ma10a.push(v ? v[1] : null); ma20a.push(v ? v[2] : null); }
-    return { dates: axis, close, ma10: ma10a, ma20: ma20a, light };
+    const vm = new Map(pts.map((p, i) => [p.date, [vals[i], ma3[i], ma9[i]]]));
+    const close = [], ma3a = [], ma9a = [];
+    for (const d of axis) { const v = vm.get(d); close.push(v ? v[0] : null); ma3a.push(v ? v[1] : null); ma9a.push(v ? v[2] : null); }
+    return { dates: axis, close, ma3: ma3a, ma9: ma9a, light };
   };
   const taiex = idxSeries('taiex'), otc = idxSeries('otc');
   if (taiex || otc) market = { taiex, otc };

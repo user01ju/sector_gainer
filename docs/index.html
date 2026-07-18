@@ -178,12 +178,12 @@
 <div class="view" id="v-trend" style="display:none;">
   <div class="crumb">
     <label class="filt mode">範圍 <select id="trendRange">
-      <option value="126">近 6 個月</option>
-      <option value="9999" selected>近 1 年</option>
+      <option value="126" selected>近 6 個月</option>
+      <option value="9999">近 1 年</option>
     </select></label>
   </div>
   <div id="trendBox"></div>
-  <div class="legend">燈號:🟢 收盤站上 MA10 與 MA20(正常進攻)・🟡 介於兩線之間(只持有不加倉)・🔴 雙雙跌破(防守/空手)。廣度與新高新低以還原序列計,上市滿半年才列入新高低統計。</div>
+  <div class="legend">燈號:🟢 MA3 > MA9(進攻)・🔴 MA3 < MA9(防守)。指數圖底部柱狀為 MA3−MA9(綠正紅負)。廣度與新高新低以還原序列計,上市滿半年才列入新高低統計。</div>
 </div>
 
 <div id="toast"></div>
@@ -586,6 +586,19 @@ function lineChart(title, dates, seriesArr, opts = {}) {
     }
     g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="' + TH.axis + '"/>';
   } else {
+    if (opts.overlay) {
+      // 底部 28% 疊 (MA3−MA9) 柱狀,獨立比例,綠正紅負
+      const ov = opts.overlay, mxo = Math.max(...ov.filter(v => v != null).map(Math.abs), 1e-9);
+      const bandH = (H - M.t - M.b) * 0.28, y0 = H - M.b - bandH / 2;
+      const bw = Math.max(1, (W - M.l - M.r) / n - 1);
+      for (let i = 0; i < n; i++) {
+        const v = ov[i];
+        if (v == null) continue;
+        const hpx = Math.abs(v) / mxo * (bandH / 2);
+        g += '<rect x="' + (X(i) - bw / 2) + '" y="' + (v >= 0 ? y0 - hpx : y0) + '" width="' + bw + '" height="' + Math.max(0.5, hpx) + '" fill="rgba(' + (v >= 0 ? TH.down : TH.up) + ',.55)"/>';
+      }
+      g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + y0 + '" y2="' + y0 + '" stroke="' + TH.zero + '" stroke-dasharray="2 3"/>';
+    }
     for (const s of seriesArr) {
       const pts = [];
       for (let i = 0; i < n; i++) if (s.vals[i] != null) pts.push(X(i).toFixed(1) + ',' + Y(s.vals[i]).toFixed(1));
@@ -606,17 +619,18 @@ function renderTrend() {
   // 時間範圍切片(6m=126 交易日 / 1Y=全部),純前端取主軸尾段
   const N = +(document.getElementById('trendRange') || { value: 9999 }).value;
   const cut = a => (a && N < a.length) ? a.slice(a.length - N) : a;
-  const sub = s => s ? { dates: cut(s.dates), close: cut(s.close), ma10: cut(s.ma10), ma20: cut(s.ma20), light: s.light } : null;
+  const sub = s => s ? { dates: cut(s.dates), close: cut(s.close), ma3: cut(s.ma3), ma9: cut(s.ma9), light: s.light } : null;
   const m0 = R.market || {};
   const m = { taiex: sub(m0.taiex), otc: sub(m0.otc) };
   const lines = [];  // crosshair tooltip 用(由上到下對應各圖)
   const idx = (s, name) => {
     if (!s) return '';
     lines.push({ label: name.replace('指數', ''), vals: s.close, fmt: v => Math.round(v).toLocaleString() });
+    const diff = s.dates.map((_, i) => (s.ma3[i] != null && s.ma9[i] != null) ? +(s.ma3[i] - s.ma9[i]).toFixed(2) : null);
     return lineChart(name + ' ' + DOT[s.light], s.dates,
       [{ vals: s.close, color: TH.cline, w: 1.4, label: '收盤' },
-       { vals: s.ma10, color: '#ff9800', label: 'MA10' },
-       { vals: s.ma20, color: '#2962ff', label: 'MA20' }]);
+       { vals: s.ma3, color: '#ff9800', label: 'MA3' },
+       { vals: s.ma9, color: '#2962ff', label: 'MA9' }], { overlay: diff });
   };
   // 順序:櫃買 → 加權 → >20MA → 淨新高(由用戶指定,方便一起判讀)
   h += idx(m.otc, '櫃買指數') + idx(m.taiex, '加權指數');
