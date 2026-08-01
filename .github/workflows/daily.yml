@@ -44,4 +44,5 @@ jobs:
           git add data docs README.md
           git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "Daily update $(TZ=Asia/Taipei date +%F)"
+          git pull --rebase
           git push

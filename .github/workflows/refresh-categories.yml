@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# 與 daily.yml 同組:每月 1 日 17:30 平日會撞 daily 的 17:05/18:05,序列化避免 push 互撞
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -32,4 +37,5 @@ jobs:
           git add data/categories.json docs README.md
           git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "Refresh categories $(TZ=Asia/Taipei date +%F)"
+          git pull --rebase
           git push

@@ -1,7 +1,8 @@
 // Scrape CMoney forum categories -> data/categories.json
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { runInNewContext } from 'vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -114,7 +115,8 @@ async function fetchStocks(code) {
     const html = await res.text();
     const m = html.match(/__NUXT__=(\(function[\s\S]*?)<\/script>/);
     if (!m) return [];
-    const nuxt = eval(m[1]);
+    // 沙箱執行,不給頁面碰 require/process/fs(遠端內容不可信)
+    const nuxt = runInNewContext(m[1], {}, { timeout: 5000 });
     const stockList = ((nuxt.data || [])[0] || {}).stockList || [];
     return stockList
       .filter(s => /^\d{4}$/.test(String(s.stockId)))
@@ -152,6 +154,18 @@ async function main() {
 
   mkdirSync(join(ROOT, 'data'), { recursive: true });
   const out = join(ROOT, 'data', 'categories.json');
+
+  // 部分改版防呆:跟現有檔比,總股數掉 >15% 或原本非空的分類變空,寧可不寫
+  if (existsSync(out)) {
+    const prev = JSON.parse(readFileSync(out, 'utf8'));
+    const prevTotal = prev.reduce((s, r) => s + r.stocks.length, 0);
+    const prevNonEmpty = new Set(prev.filter(r => r.stocks.length > 0).map(r => r.code));
+    const wentEmpty = results.filter(r => r.stocks.length === 0 && prevNonEmpty.has(r.code));
+    if (total < prevTotal * 0.85 || wentEmpty.length) {
+      process.stderr.write(`SANITY FAIL: total ${total} (prev ${prevTotal}), newly-empty: ${wentEmpty.map(r => r.name).join(',') || 'none'} - aborting without writing.\n`);
+      process.exit(1);
+    }
+  }
   writeFileSync(out, JSON.stringify(results, null, 2), 'utf8');
   process.stderr.write(`\nDone: ${results.length} categories (${empty.length} empty), ${total} stock entries\nSaved -> ${out}\n`);
 }
