@@ -1,0 +1,40 @@
+name: Verify data (Tier B)
+
+# 交叉源驗證(會打外部 API):加權指數 close 與除權息參考價比對 twse_website 的 gh-pages 產物。
+# 獨立於 Daily update:這裡紅了只代表兩邊資料對不起來,不影響每日資料更新與 Pages 部署。
+# Tier A(零外部呼叫)掛在 daily.yml 的 commit 之前,不在這裡重跑。
+
+on:
+  schedule:
+    # 台北 21:00(UTC 13:00),週一~五。
+    # 排在本 repo 的 Daily update(台北 15~18:05)與 twse_website 的重試窗口之後,
+    # 兩邊都更新完才比對,避免「對方還沒跑」造成的無意義 SKIP。
+    # 注意 GitHub Actions schedule 常有大幅延遲,這是診斷性排程,不保證準點。
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # exit 1 = FAIL(兩邊都拿到資料但數字對不起來)→ 讓 workflow 紅
+      # exit 2 = 只有 WARN;外部源掛掉/超時一律 SKIP,不算失敗
+      - name: Verify data (Tier B)
+        run: |
+          rc=0
+          node scripts/verify.mjs --tier b || rc=$?
+          if [ "$rc" -eq 2 ]; then
+            echo "::warning::Tier B 驗證有 WARN(exit 2)"
+          elif [ "$rc" -ne 0 ]; then
+            echo "::error::Tier B 驗證失敗(exit $rc)"
+            exit 1
+          fi

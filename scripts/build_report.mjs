@@ -26,6 +26,31 @@ const files = readdirSync(DAILY).filter(f => /^\d{4}-\d{2}-\d{2}\.csv$/.test(f))
 if (!files.length) { console.error('no daily data'); process.exit(1); }
 const dates = files.map(f => f.slice(0, 10));
 
+// 除權息日碰到臨時休市(颱風假)會順延:交易所在次一交易日才拿參考價當基準算漲跌,
+// 但 exrights.csv 記的是原定日期。不順延的話 lookup 必 miss,整段配息缺口被當成真實下跌。
+// 實例:2026-07-10 颱風休市,17 檔的參考價實際在 2026-07-13 生效(3217 前收 173.5→ref 163.5,
+// 交易所 7/13 算的漲跌 -2.14% = 160/163.5-1;不順延則鏈上得到 -7.78%)。
+// 只順延「原定日在資料範圍內、且次一交易日在 MAX_ROLL 天內、目標鍵未被占用」的情形,
+// 避免把「單日漏抓」或未來預告的除權息誤搬。
+{
+  const MAX_ROLL = 5;                       // 日曆天;台股連續休市極少超過這個長度
+  const tradingDays = new Set(dates);
+  const rolled = [];
+  for (const [key, ref] of [...exrights]) {
+    const [d, id] = key.split('|');
+    if (tradingDays.has(d) || d < dates[0] || d > dates[dates.length - 1]) continue;
+    const next = dates.find(x => x > d);
+    if (!next) continue;
+    if ((new Date(next) - new Date(d)) / 86400e3 > MAX_ROLL) continue;
+    const dst = `${next}|${id}`;
+    if (exrights.has(dst)) continue;        // 該股次一日本來就除權息 → 別覆蓋
+    exrights.delete(key);
+    exrights.set(dst, ref);
+    rolled.push(`${d}->${next} ${id}`);
+  }
+  if (rolled.length) process.stderr.write(`除權息日順延(休市) ${rolled.length} 筆: ${rolled.slice(0, 5).join(', ')}${rolled.length > 5 ? ' ...' : ''}\n`);
+}
+
 const marketOf = new Map(); // id -> TWSE/TPEX(以最新出現日為準,轉板取新)
 function loadDay(f) {
   const map = new Map();

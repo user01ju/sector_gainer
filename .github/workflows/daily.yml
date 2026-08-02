@@ -37,6 +37,22 @@ jobs:
       - name: Build report
         run: node scripts/build_report.mjs
 
+      # 資料驗證 Tier A(零外部呼叫,見 VERIFICATION.md)。
+      # 位置必須在下面的 commit step 之前:那一步的
+      # `git diff --cached --quiet && echo "no changes" && exit 0`
+      # 會在 TWSE 連續被擋、資料完全沒更新時讓 workflow 綠燈通過,報表默默停更。
+      # exit 1 = FAIL(擋掉 commit 並讓 workflow 變紅);exit 2 = 只有 WARN,不擋。
+      - name: Verify data (Tier A)
+        run: |
+          rc=0
+          node scripts/verify.mjs --tier a || rc=$?
+          if [ "$rc" -eq 2 ]; then
+            echo "::warning::Tier A 驗證有 WARN(exit 2),不擋 commit"
+          elif [ "$rc" -ne 0 ]; then
+            echo "::error::Tier A 驗證失敗(exit $rc),停止 commit"
+            exit 1
+          fi
+
       - name: Commit & push
         run: |
           git config user.name "github-actions[bot]"
