@@ -6,6 +6,11 @@ on:
     # 盤後資料齊全時間不定,跑多次;fetch 對未齊的當天不寫檔,留待下一輪補抓
     - cron: '5 7-10 * * 1-5'
   workflow_dispatch:
+    inputs:
+      skip_verify:
+        description: '略過資料驗證直接 commit（確定是假警報、門檻還沒空修時的逃生門）'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,6 +48,7 @@ jobs:
       # 會在 TWSE 連續被擋、資料完全沒更新時讓 workflow 綠燈通過,報表默默停更。
       # exit 1 = FAIL(擋掉 commit 並讓 workflow 變紅);exit 2 = 只有 WARN,不擋。
       - name: Verify data (Tier A)
+        if: github.event.inputs.skip_verify != 'true'
         run: |
           rc=0
           node scripts/verify.mjs --tier a || rc=$?
