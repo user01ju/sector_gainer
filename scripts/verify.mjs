@@ -60,6 +60,10 @@ const EXREF_RATIO_MAX = 1.1;
 // 比值超出區間時的佐證門檻:交易所當天的漲跌停是拿參考價當基準算的,
 // 所以真參考價必然滿足 |當日成交價/參考價 - 1| <= 10%。留 0.5pp 給尾差。
 const EXREF_CORROBORATE_PCT = 10.5;
+// 佐證得過的離群值只在近幾個交易日內給 WARN。再早的已經被市價驗證過、也看過一輪了,
+// 留著只會讓 daily.yml 天天噴 warning(公司行動那筆會永遠留在 exrights.csv),
+// 常態黃燈會稀釋掉真正該看的告警。
+const EXREF_CORROBORATE_RECENT_TD = 5;
 // 除權息日缺 daily 檔:近幾個交易日內算 FAIL(backfill 7 還救得回來,擋 commit 有意義),
 // 更早的算 WARN —— 歷史破洞要手動 force backfill,不該把每日 pipeline 永久卡死。
 const EXRIGHTS_HOLE_RECENT_TD = 5;
@@ -419,8 +423,10 @@ function checkExrightsIntegrity() {
   // 真參考價必然被當天成交價圍住(±10%),抓錯欄位的假參考價不可能對得上。
   // 佐證得過只給 WARN —— 一檔真實公司行動不該把每日 pipeline 永久卡死(同
   // exrights-date-has-daily 的取捨);佐證不過或當天根本沒成交,維持 FAIL。
+  // WARN 只在近幾個交易日內給:那筆會永遠留在 exrights.csv,一直告警就是天天黃燈。
   const dd = ctx.dailyDates;
-  let checked = 0, lo = Infinity, hi = 0;
+  const recentCut = dd[Math.max(0, dd.length - EXREF_CORROBORATE_RECENT_TD)];
+  let checked = 0, lo = Infinity, hi = 0, settled = 0;
   const outliers = [], corroborated = [];
   for (const r of rows) {
     const i = dd.indexOf(r.date);
@@ -436,15 +442,17 @@ function checkExrightsIntegrity() {
     const gap = day && day.close > 0 ? pct(day.close, r.ref) : null;
     const desc = `${r.date} ${r.id} ${prev.close}->${r.ref}(${ratio.toFixed(3)}),當日成交 ` +
       (gap == null ? '無(無法佐證)' : `${day.close} 距參考價 ${gap.toFixed(2)}%`);
-    if (gap != null && Math.abs(gap) <= EXREF_CORROBORATE_PCT) corroborated.push(desc);
-    else outliers.push(desc);
+    if (!(gap != null && Math.abs(gap) <= EXREF_CORROBORATE_PCT)) outliers.push(desc);
+    else if (r.date >= recentCut) corroborated.push(desc);
+    else settled++;
   }
   const msg = `${rows.length} 筆、${seen.size} 個 (date,id);ref/前收 比值 ${checked} 筆檢查,範圍 ${lo === Infinity ? 'n/a' : lo.toFixed(3)}~${hi.toFixed(3)}(合理區間 ${EXREF_RATIO_MIN}~${EXREF_RATIO_MAX})`;
   if (problems.length || outliers.length)
     return ['FAIL', `exrights.csv ${msg} — ${[...problems, ...outliers].slice(0, 3).join(' ; ')}`];
+  const aged = settled ? `;另 ${settled} 筆超出區間但已由當日成交價佐證,且早於近 ${EXREF_CORROBORATE_RECENT_TD} 個交易日,不再告警` : '';
   if (corroborated.length)
-    return ['WARN', `exrights.csv ${msg} — ${corroborated.length} 筆超出區間但當日成交價佐證參考價無誤(大型公司行動,不擋 commit):${corroborated.slice(0, 3).join(' ; ')}`];
-  return ['PASS', `exrights.csv ${msg}`];
+    return ['WARN', `exrights.csv ${msg}${aged} — ${corroborated.length} 筆超出區間但當日成交價佐證參考價無誤(大型公司行動,不擋 commit):${corroborated.slice(0, 3).join(' ; ')}`];
+  return ['PASS', `exrights.csv ${msg}${aged}`];
 }
 
 // 除權息日沒有對應的 daily 檔,有兩種完全不同的成因,修法相反:

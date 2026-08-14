@@ -60,6 +60,8 @@ exit code：`0` 全過（或只有 SKIP）／`1` 至少一條 FAIL／`2` 沒 FAI
 
 佐證得過 → WARN（不擋 commit）；佐證不過、或那天根本沒成交（無從佐證）→ 維持 FAIL。取捨同 `exrights-date-has-daily`：一檔真實公司行動不該把每日 pipeline 永久卡死——這條擋的是 commit，而 fetch 每輪都會重抓同一筆，卡住就是天天紅、資料停更。
 
+WARN 只在**近 5 個交易日內**給。公司行動那筆會永遠留在 `exrights.csv`，不設窗口就是天天黃燈；早於這個窗口的（已被市價佐證過、也看過一輪了）降回 PASS，只在訊息末尾附一句筆數。常態黃燈會稀釋掉真正該看的告警——這個 repo 最怕的失效模式正是「CI 綠燈、資料默默停更」。
+
 實例：2026-08-14 TPEX 5314 前收 61.3 → 參考價 14.75（比值 0.241），是 run #71（`Daily update`）唯一的 FAIL，把當天整批資料擋在 commit 之外。
 
 ## `exrights-date-has-daily`：兩種成因，修法相反
