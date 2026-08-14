@@ -57,6 +57,9 @@ const OTC_REQUIRED_ROWS = 60;
 // 除權息參考價 / 前一日收盤 的合理區間(實測 2626 筆落在 0.66~1.02)
 const EXREF_RATIO_MIN = 0.5;
 const EXREF_RATIO_MAX = 1.1;
+// 比值超出區間時的佐證門檻:交易所當天的漲跌停是拿參考價當基準算的,
+// 所以真參考價必然滿足 |當日成交價/參考價 - 1| <= 10%。留 0.5pp 給尾差。
+const EXREF_CORROBORATE_PCT = 10.5;
 // 除權息日缺 daily 檔:近幾個交易日內算 FAIL(backfill 7 還救得回來,擋 commit 有意義),
 // 更早的算 WARN —— 歷史破洞要手動 force backfill,不該把每日 pipeline 永久卡死。
 const EXRIGHTS_HOLE_RECENT_TD = 5;
@@ -407,10 +410,18 @@ function checkExrightsIntegrity() {
     if (seen.has(k)) dup++; else seen.add(k);
   }
   if (dup) problems.push(`重複 (date,id) ${dup} 筆`);
-  // 參考價 vs 前一交易日收盤的比值(除權息幅度);超出區間 = 抓錯欄位或串錯股號
+  // 參考價 vs 前一交易日收盤的比值(除權息幅度)。超出區間有兩種成因,修法相反:
+  //  (1) 抓錯欄位/串錯股號 —— 假參考價與市場當天的實際成交價完全對不上,要修 fetch。
+  //  (2) 真的大型公司行動(大額現增、面額變更 1拆4、減資換發)—— exrights.csv 匯的是
+  //      四個來源(TWT49U 除權息 / TWTAUU 減資 / TWTB8U 面額變更 / TPEX revivt),
+  //      後三者的參考價本來就離前收很遠,單一 0.5~1.1 區間對它們是誤判。
+  // 分辨指紋:除權息當日的成交價。交易所那天的漲跌停是拿參考價當基準算的,
+  // 真參考價必然被當天成交價圍住(±10%),抓錯欄位的假參考價不可能對得上。
+  // 佐證得過只給 WARN —— 一檔真實公司行動不該把每日 pipeline 永久卡死(同
+  // exrights-date-has-daily 的取捨);佐證不過或當天根本沒成交,維持 FAIL。
   const dd = ctx.dailyDates;
   let checked = 0, lo = Infinity, hi = 0;
-  const outliers = [];
+  const outliers = [], corroborated = [];
   for (const r of rows) {
     const i = dd.indexOf(r.date);
     if (i < 1) continue;
@@ -420,12 +431,19 @@ function checkExrightsIntegrity() {
     checked++;
     if (ratio < lo) lo = ratio;
     if (ratio > hi) hi = ratio;
-    if (ratio < EXREF_RATIO_MIN || ratio > EXREF_RATIO_MAX)
-      outliers.push(`${r.date} ${r.id} ${prev.close}->${r.ref}(${ratio.toFixed(3)})`);
+    if (ratio >= EXREF_RATIO_MIN && ratio <= EXREF_RATIO_MAX) continue;
+    const day = ctx.dayMap(r.date).get(r.id);
+    const gap = day && day.close > 0 ? pct(day.close, r.ref) : null;
+    const desc = `${r.date} ${r.id} ${prev.close}->${r.ref}(${ratio.toFixed(3)}),當日成交 ` +
+      (gap == null ? '無(無法佐證)' : `${day.close} 距參考價 ${gap.toFixed(2)}%`);
+    if (gap != null && Math.abs(gap) <= EXREF_CORROBORATE_PCT) corroborated.push(desc);
+    else outliers.push(desc);
   }
   const msg = `${rows.length} 筆、${seen.size} 個 (date,id);ref/前收 比值 ${checked} 筆檢查,範圍 ${lo === Infinity ? 'n/a' : lo.toFixed(3)}~${hi.toFixed(3)}(合理區間 ${EXREF_RATIO_MIN}~${EXREF_RATIO_MAX})`;
   if (problems.length || outliers.length)
     return ['FAIL', `exrights.csv ${msg} — ${[...problems, ...outliers].slice(0, 3).join(' ; ')}`];
+  if (corroborated.length)
+    return ['WARN', `exrights.csv ${msg} — ${corroborated.length} 筆超出區間但當日成交價佐證參考價無誤(大型公司行動,不擋 commit):${corroborated.slice(0, 3).join(' ; ')}`];
   return ['PASS', `exrights.csv ${msg}`];
 }
 
