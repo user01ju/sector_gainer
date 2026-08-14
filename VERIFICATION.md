@@ -33,7 +33,7 @@ exit code：`0` 全過（或只有 SKIP）／`1` 至少一條 FAIL／`2` 沒 FAI
 | `sector-gain-recalc` | 抽 3 大類股重算成交金額占比加權漲幅 |
 | `report-schema` | report.json 結構 + **`docs/data.js` / `scanner.js` 日期同步** |
 | `market-index-integrity` | 日期嚴格遞增唯一、無週末列、單日變動上限 |
-| `exrights-integrity` | 筆數／鍵唯一性／ref 對前收比值合理區間 |
+| `exrights-integrity` | 筆數／鍵唯一性／ref 對前收比值合理區間，**超區間再用當日成交價佐證** |
 | `exrights-date-has-daily` | 除權息日缺行情檔，**分辨休市順延 vs 真漏抓** |
 | `hub-files-present` | 資料 hub 四個產物齊備 |
 
@@ -48,6 +48,19 @@ exit code：`0` 全過（或只有 SKIP）／`1` 至少一條 FAIL／`2` 沒 FAI
 **`sector-gain-recalc` 原本規劃在 Tier B，實作放 Tier A**：這條完全不需要外部呼叫（從 `data/daily/*.csv` + `data/exrights.csv` 獨立重算），放 Tier B 等於每天只守一次還不擋 commit；放 Tier A 每次 CI 都守著聚合邏輯，成本不到 0.1 秒。抽成交金額最大的 3 個而非 1 個，deterministic 且結果穩定可比對。
 
 **`exdiv-blank-change-has-ref`**：TWSE 除息日 `漲跌價差` 是 `X`，`fetch_daily` 的 `num()` 吃成 `null` → csv 存空字串；`build_report` 的 fallback 是 `change != null ? close - change : close`，也就是**缺參考價時當日漲幅靜默變 0.00%**，還原鏈那一節也斷。見 llm_wiki: twse-exdiv-change-x-zero-pct。
+
+## `exrights-integrity`：比值超區間也是兩種成因
+
+`ref/前收` 落在 0.5~1.1 之外，同樣有兩種相反的成因：
+
+1. **抓錯欄位／串錯股號**：假參考價跟市場當天實際成交的價位完全對不上，要修 `fetch_exrights.mjs`。
+2. **真的大型公司行動**：`exrights.csv` 匯的是四個來源（`TWT49U` 除權息／`TWTAUU` 減資／`TWTB8U` 面額變更／TPEX `revivt`），後三者的參考價本來就會離前收很遠——`TWTB8U` 的 1 拆 4 比值恆為 0.25，單一 0.5~1.1 區間對它們是結構性誤判。
+
+分辨指紋是**除權息當日的成交價**：交易所那天的漲跌停是拿參考價當基準算的，所以真參考價必然被當天成交價圍住（±10%，留 0.5pp 給尾差），抓錯欄位的假參考價不可能對得上。這條佐證零外部呼叫，只讀 `data/daily/<除權息日>.csv`。
+
+佐證得過 → WARN（不擋 commit）；佐證不過、或那天根本沒成交（無從佐證）→ 維持 FAIL。取捨同 `exrights-date-has-daily`：一檔真實公司行動不該把每日 pipeline 永久卡死——這條擋的是 commit，而 fetch 每輪都會重抓同一筆，卡住就是天天紅、資料停更。
+
+實例：2026-08-14 TPEX 5314 前收 61.3 → 參考價 14.75（比值 0.241），是 run #71（`Daily update`）唯一的 FAIL，把當天整批資料擋在 commit 之外。
 
 ## `exrights-date-has-daily`：兩種成因，修法相反
 
