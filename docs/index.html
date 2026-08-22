@@ -70,6 +70,24 @@
   .crumb button { padding:4px 10px; border:1px solid var(--border); border-radius:4px; background:var(--panel-alt); color:var(--text); cursor:pointer; font-size:12px; }
   #scBox { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px; }
   .legend { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.6; }
+  .gloss { margin:0 16px 40px; border-top:1px solid var(--border); padding-top:10px; }
+  .gloss > summary { cursor:pointer; color:var(--text2); font-size:12.5px; padding:4px 0; user-select:none; list-style:none; }
+  .gloss > summary::before { content:"▸ "; }
+  .gloss[open] > summary::before { content:"▾ "; }
+  .gloss > summary:hover { color:var(--text); }
+  .gloss-body { max-width:1000px; font-size:12.5px; line-height:1.65; color:var(--text2); padding:6px 0 4px; }
+  .gloss-body h4 { color:var(--text); font-size:12.5px; margin:16px 0 6px; }
+  .gloss-body dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:0; }
+  .gloss-body dt { color:var(--text); font-weight:600; white-space:nowrap; }
+  .gloss-body dd { margin:0; }
+  .gloss-body code { background:var(--panel-alt); border-radius:3px; padding:1px 4px; font-size:11.5px; }
+  .gloss-tbl { border:1px solid var(--border); border-radius:6px; }
+  .gloss-tbl th { position:static; text-align:left; cursor:default; }
+  .gloss-tbl td { white-space:normal; vertical-align:top; }
+  .gloss-tbl td:first-child { color:var(--text); font-weight:600; white-space:nowrap; }
+  .gloss-tbl td:last-child, .gloss-tbl th:last-child { white-space:nowrap; color:var(--text); }
+  .gloss-note { margin-top:8px; }
+  @media (max-width:700px) { .gloss-body dl { grid-template-columns:1fr; gap:2px; } .gloss-body dd { margin-bottom:8px; } }
   svg text { font-family:inherit; }
 </style>
 </head>
@@ -136,6 +154,9 @@
       <option value="d">當日%</option><option value="w1" selected>1w%</option><option value="m1">1m%</option>
       <option value="m3">3m%</option><option value="m6">6m%</option><option value="m12">12m%</option>
     </select></label>
+    <label class="sub">量 ≥ <input type="range" id="scMinT" min="0" max="15" step="1" value="7" style="width:120px;vertical-align:middle;"><b id="scMinTv" style="display:inline-block;min-width:52px;"></b></label>
+    <span class="sub" id="scCount" style="font-weight:600;"></span>
+    <span style="flex:1"></span>
     <span class="sub">泡泡大小 = 成交金額,顏色 = 當日漲跌;右上 = 雙強、左上 = 短強長弱(補漲)、右下 = 短弱長強(回檔)</span>
   </div>
   <div id="scBox"></div>
@@ -164,7 +185,7 @@
   <table id="scanTbl">
     <thead><tr>
       <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="close">收盤</th>
-      <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th><th data-sk="vq">量縮</th><th data-sk="p10">距10高%</th>
+      <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th><th data-sk="vq">量縮</th><th data-sk="p10">距10高%</th><th data-sk="lh">腿高%</th>
       <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th>
       <th data-sk="m3">3m%</th><th data-sk="m6">6m%</th><th data-sk="m12">12m%</th>
       <th class="nosort">1y 走勢</th>
@@ -172,7 +193,7 @@
     <tbody></tbody>
   </table>
   </div>
-  <div class="legend">收縮中 = 動能腿後短線整理(Q 式旗形候選);今日突破 = 昨日仍在收縮帶、今日大漲;ADR20 為收盤高低價計算。族群篩選不適用本頁,搜尋適用。</div>
+  <div class="legend">收縮中 = 動能腿後短線整理(Q 式旗形候選);動能腿門檻比的是<b>腿高%</b>(所選尺度窗口內的還原高點 vs 基準日),不是現價報酬,所以深回檔不會把設定成形中的股票踢出名單;今日突破 = 昨日仍在收縮帶、今日大漲;ADR20 為收盤高低價計算。族群篩選不適用本頁,搜尋適用。</div>
 </div>
 
 <div class="view" id="v-trend" style="display:none;">
@@ -185,6 +206,55 @@
   <div id="trendBox"></div>
   <div class="legend">燈號:🟢 MA3 > MA9(進攻)・🔴 MA3 < MA9(防守)。指數圖底部柱狀為 MA3−MA9(綠正紅負)。廣度與新高新低以還原序列計,上市滿半年才列入新高低統計。</div>
 </div>
+
+<details class="gloss">
+  <summary>名詞解釋 / 欄位定義</summary>
+  <div class="gloss-body">
+
+    <h4>資料處理</h4>
+    <dl>
+      <dt>還原權息</dt><dd>每日報酬 = <code>收盤 / (除權息參考價 ?? 前一交易日收盤)</code>,連乘成還原指數。全站的漲跌幅、高點、均線都走這條鏈,配息不會被當成下跌。單日跳動超過 ±12%(跨缺資料日最多複利兩次)視為未知資本事件,當價值中性處理。</dd>
+      <dt>基準日</dt><dd>1w = 日曆 −7 天;1m/3m/6m/12m = 日曆回推 N 個月,再取 ≤ 該日的最後一個交易日。停牌過的個股基準會更舊,實際期間偏長。</dd>
+      <dt>當日%</dt><dd><code>收盤 / (除權息參考價 ?? 前收) − 1</code>。除權息日不會出現假跌。</dd>
+      <dt>類股漲幅</dt><dd>成分股漲幅按<b>當日成交金額占比</b>加權(不是等權、不是市值權)。排除創新板(-創 / KY創):漲跌幅制度不同,單檔妖股會用爆量搶到高權重再乘以天文數字漲幅,污染整個類股。</dd>
+    </dl>
+
+    <h4>表格 / 市場地圖 / 動能散點</h4>
+    <dl>
+      <dt>1w ~ 12m%</dt><dd>各基準日到今天的還原報酬。</dd>
+      <dt>成交比重</dt><dd>該類股當日成交金額 / 全市場成交金額。</dd>
+      <dt>磁磚(市場地圖)</dt><dd>面積 = 當日成交金額,顏色 = 所選尺度漲跌(紅漲綠跌);深淺是相對強弱,用全體 p90 標準化,不是絕對值。</dd>
+      <dt>散點象限</dt><dd>X 長天期、Y 短天期。<b>右下</b>(長強短弱)= 大漲後休息,旗形在此形成,獵場;<b>右上</b>= 正在噴,只買突破不追價;<b>左上</b>= 補漲,不做;左下無視。</dd>
+      <dt>量 ≥ N 億(散點)</dt><dd>只畫成交金額達標的類股。87 個子類股裡一堆 3~5 檔的小類,不濾掉圖會糊成一片。</dd>
+    </dl>
+
+    <h4>突破掃描</h4>
+    <table class="gloss-tbl">
+      <thead><tr><th>欄位</th><th>定義</th><th>好的數值</th></tr></thead>
+      <tbody>
+        <tr><td>動能腿 / 腿高%</td><td>所選尺度(1m/3m/6m)窗口內的<b>還原高點</b> / 基準日還原值 − 1。量「這條腿最高漲到多少」,不是「到今天還剩多少」——腿漲完後回檔多深都不會被踢出名單,那正是旗形成形的時候。</td><td>3m ≥ 50%</td></tr>
+        <tr><td>量(億)</td><td>當日成交金額。流動性是硬條件,小量股再強也不能碰。</td><td>≥ 3 億,部位大就提高</td></tr>
+        <tr><td>ADR%</td><td>近 20 日平均 <code>(最高/最低 − 1)</code>,Q 的定義。波動性 = 利潤潛力。</td><td>≥ 4(嚴格 5+)</td></tr>
+        <tr><td>距高%</td><td><code>今天 / 52 週還原高 − 1</code>。頭頂還有多少套牢賣壓。「回檔太深已經不能碰」由這條管,不是動能門檻的事。</td><td>&gt; −15%</td></tr>
+        <tr><td>10日幅%</td><td>近 10 日還原高 / 低 − 1。整理帶的緊度,越小代表收縮越乾淨。</td><td>&lt; 10%</td></tr>
+        <tr><td>量縮</td><td>近 5 日均量 / 近 20 日均量。整理期該量枯。</td><td>&lt; 0.6 佳,&gt; 1.2 可疑</td></tr>
+        <tr><td>距10高%</td><td><code>今天 / 近 10 日還原高 − 1</code>,窗口含今天所以恆 ≤ 0。樞紐價距離的代理(真正的整理區高點要看圖才畫得出來),答的是「明天誰最可能觸發」——排序器,不是篩選器。</td><td>&gt; −3% 一觸即發</td></tr>
+        <tr><td>1w%</td><td>旗形中的位置。太深 = 還在跌,太淺 = 還沒回。</td><td>−8% ~ +3%,近 0 最佳</td></tr>
+        <tr><td>12m% + 1y 走勢</td><td>故事的長度。第一段腿後的第一、二面旗最會漲;漲了一年的第五面旗少碰。</td><td>樓梯型健康,拋物線=末段,鋸齒=籌碼亂</td></tr>
+      </tbody>
+    </table>
+    <div class="gloss-note">三種模式共用上面這組底層條件,差別只在專屬條件:<b>收縮中</b> = 動能腿後短線整理(1w 在帶內 + 當日小幅),旗形候選;<b>今日突破</b> = 昨日仍在收縮帶、今日大漲;<b>全部動能股</b> = 只過底層條件。族群下拉不作用於本頁,搜尋可用。</div>
+
+    <h4>市場趨勢 / 頁首燈號</h4>
+    <dl>
+      <dt>🟢 / 🔴 燈號</dt><dd>加權、櫃買各自的 MA3 vs MA9 交叉:🟢 MA3 &gt; MA9 可進攻、🔴 MA3 &lt; MA9 不開新倉。指數圖底部柱狀 = MA3 − MA9(綠正紅負,獨立比例尺)。</dd>
+      <dt>&gt; 20MA 比例</dt><dd>全市場收盤在 20 日均線之上的家數比例。&gt; 60% 順風、&lt; 50% 警戒、&lt; 30% 留意超賣反轉。</dd>
+      <dt>52 週淨新高</dt><dd>創 52 週新高家數 − 新低家數(還原序列計,上市滿半年才列入)。指數創高但淨新高轉負 = 背離,該收緊停損。</dd>
+      <dt>燈號 vs 廣度打架時</dt><dd>信廣度。指數可以被權值股扛住,中小型突破股不行。</dd>
+    </dl>
+
+  </div>
+</details>
 
 <div id="toast"></div>
 <script src="data.js"></script>
@@ -437,9 +507,14 @@ function niceTicks(mn, mx, n) {
   for (let t = Math.ceil(mn / step) * step; t <= mx + 1e-9; t += step) out.push(+t.toFixed(6));
   return out;
 }
+const SC_TSTEPS = [0, 1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500];
 function renderScatter() {
   const kx = document.getElementById('scX').value, ky = document.getElementById('scY').value;
-  const rows = filtered().filter(s => s[kx] != null && s[ky] != null);
+  const minT = SC_TSTEPS[+document.getElementById('scMinT').value];
+  const all = filtered().filter(s => s[kx] != null && s[ky] != null);
+  const rows = all.filter(s => s.turnover >= minT * 1e8);
+  document.getElementById('scMinTv').textContent = minT + ' 億';
+  document.getElementById('scCount').textContent = rows.length + ' / ' + all.length + ' 類股';
   if (!rows.length) { document.getElementById('scBox').innerHTML = ''; return; }
   const W = 980, H = 520, M = { l: 56, r: 20, t: 16, b: 40 };
   let xmn = Math.min(0, ...rows.map(s => s[kx])), xmx = Math.max(0, ...rows.map(s => s[kx]));
@@ -471,6 +546,7 @@ function renderScatter() {
   g += '</svg>';
   document.getElementById('scBox').innerHTML = g;
 }
+document.getElementById('scMinT').oninput = renderScatter;
 document.getElementById('scX').onchange = renderScatter;
 document.getElementById('scY').onchange = renderScatter;
 
@@ -493,10 +569,11 @@ function renderScan() {
   document.getElementById('w1tag').textContent = mode === 'brk' ? '前5日(不含今日)' : '1w';
   const q = document.getElementById('search').value.trim().toLowerCase();
   const MK = document.getElementById('scMomoK').value, MV = scanVal('scMomo'), W1lo = scanVal('scW1lo'), W1hi = scanVal('scW1hi');
+  const LHK = 'lh' + MK.slice(1); // 動能腿判準 = 腿高(窗口內還原高點 vs 基準日),不受事後回檔侵蝕
   const Dmax = scanVal('scD'), BRK = scanVal('scBrk'), VOL = scanVal('scVol') * 1e8, ADR = scanVal('scAdr'), OFF = scanVal('scOff');
   let rows = SC.filter(x => {
     if (q && !(x.id.includes(q) || x.name.toLowerCase().includes(q) || x.sec.toLowerCase().includes(q))) return false;
-    if (x[MK] == null || x[MK] < MV) return false;
+    if (x[LHK] == null || x[LHK] < MV) return false;
     if (x.turnover < VOL) return false;
     if (ADR > 0 && (x.adr == null || x.adr < ADR)) return false;
     if (x.off == null || x.off < -OFF) return false;
@@ -512,8 +589,9 @@ function renderScan() {
     }
     return true;
   });
+  const sortKey = scanSortKey === 'lh' ? LHK : scanSortKey;
   rows.sort((a, b) => {
-    const va = a[scanSortKey], vb = b[scanSortKey];
+    const va = a[sortKey], vb = b[sortKey];
     if (typeof va === 'string') return va.localeCompare(vb, 'zh-TW') * -scanSortDir;
     return ((va ?? -9999) - (vb ?? -9999)) * scanSortDir;
   });
@@ -528,6 +606,7 @@ function renderScan() {
     '<td class="num">' + (x.tight == null ? '--' : x.tight.toFixed(1)) + '</td>' +
     '<td class="num">' + (x.vq == null ? '--' : x.vq.toFixed(2)) + '</td>' +
     '<td class="num">' + (x.p10 == null ? '--' : x.p10.toFixed(1)) + '</td>' +
+    '<td class="num">' + (x[LHK] == null ? '--' : x[LHK].toFixed(1)) + '</td>' +
     METRICS.map(k => cellStk(x[k], k)).join('') +
     '<td>' + sparkSvg(x.spark) + '</td></tr>').join('');
 }

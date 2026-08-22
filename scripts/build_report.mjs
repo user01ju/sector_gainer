@@ -359,6 +359,15 @@ for (const [id, s] of series) {
   let maxCum = 0;
   for (let j = s.pos.length - 1; j >= 0 && s.pos[j] >= start12; j--) if (s.cum[j] > maxCum) maxCum = s.cum[j];
   const off = maxCum > 0 ? +((cumT / maxCum - 1) * 100).toFixed(1) : null;
+  // 動能腿高:窗口內還原高點 / 基準日還原值 − 1。量「這條腿曾經多強」,不會被事後回檔侵蝕
+  const legHigh = {};
+  for (const k of ['m1', 'm3', 'm6']) {
+    const bi = baseIdx[k];
+    const base = bi >= 0 ? cumAt(id, bi) : null;
+    let hi = 0;
+    if (base != null) for (let j = s.pos.length - 1; j >= 0 && s.pos[j] >= bi; j--) if (s.cum[j] > hi) hi = s.cum[j];
+    legHigh['lh' + k.slice(1)] = base > 0 && hi > 0 ? +((hi / base - 1) * 100).toFixed(2) : null;
+  }
   // 還原序列對 MA 的距離
   const maDist = n => {
     if (s.cum.length < n) return null;
@@ -388,7 +397,7 @@ for (const [id, s] of series) {
   }
   // 動能預篩通過者才帶 sparkline,控制檔案大小
   let spark = [];
-  if ((m.m1 != null && m.m1 >= 15) || (m.m3 != null && m.m3 >= 30)) {
+  if ((legHigh.lh1 != null && legHigh.lh1 >= 15) || (legHigh.lh3 != null && legHigh.lh3 >= 30)) {
     let base = null;
     spark = sparkSamples.map(idx => {
       const c = cumAt(id, idx);
@@ -401,6 +410,7 @@ for (const [id, s] of series) {
     id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'),
     close: m.close, turnover: m.turnover,
     adr, off, ma10: maDist(10), ma20: maDist(20), ma50: maDist(50), tight, vq, p10,
+    ...legHigh,
     ...Object.fromEntries(METRICS.map(k => [k, m[k] == null ? null : +m[k].toFixed(2)])),
     spark,
   });
