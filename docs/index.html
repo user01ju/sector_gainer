@@ -70,6 +70,7 @@
   .crumb button { padding:4px 10px; border:1px solid var(--border); border-radius:4px; background:var(--panel-alt); color:var(--text); cursor:pointer; font-size:12px; }
   #scBox { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px; }
   .legend { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.6; }
+  .tagcell { color:var(--text2); font-size:11.5px; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
   .gloss { margin:0 16px 40px; border-top:1px solid var(--border); padding-top:10px; }
   .gloss > summary { cursor:pointer; color:var(--text2); font-size:12.5px; padding:4px 0; user-select:none; list-style:none; }
   .gloss > summary::before { content:"▸ "; }
@@ -103,6 +104,7 @@
   <button data-v="table" class="on">表格</button>
   <button data-v="map">市場地圖</button>
   <button data-v="scatter">動能散點</button>
+  <button data-v="theme">題材榜</button>
   <button data-v="scan">突破掃描</button>
   <button data-v="trend">市場趨勢</button>
 </nav>
@@ -162,6 +164,28 @@
   <div id="scBox"></div>
 </div>
 
+<div class="view" id="v-theme" style="display:none;">
+  <div class="crumb">
+    <label class="filt">檔數 ≥ <input type="number" id="thMinN" value="5" style="width:44px"></label>
+    <label class="filt">量 ≥ <input type="number" id="thMinT" value="10" style="width:48px">億</label>
+    <label class="filt">大類 <select id="thGrp"><option value="">全部</option></select></label>
+    <span class="sub" id="thCount" style="font-weight:600;"></span>
+    <span style="flex:1"></span>
+    <span class="sub">MoneyDJ 細產業 ・ 漲幅為成分股中位數</span>
+  </div>
+  <div class="tbl-wrap">
+  <table id="thTbl">
+    <thead><tr>
+      <th data-tk="name">題材</th><th data-tk="g">大類</th><th data-tk="n">檔數</th><th data-tk="turnover">量(億)</th>
+      <th data-tk="d">當日%</th><th data-tk="w1">1w%</th><th data-tk="m1">1m%</th>
+      <th data-tk="m3">3m%</th><th data-tk="m6">6m%</th><th data-tk="m12">12m%</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  </div>
+  <div class="legend">題材分類來自 MoneyDJ 細產業(一檔平均屬 3.5 類,鴻海 32 類)。<b>漲幅用中位數不用成交金額加權</b>:多重歸屬下同一檔會同時帶動它所屬的每一類,加權會讓一排題材看起來同時發動;中位數則單檔綁架不了整個題材。檔數中位數只有 4,預設濾掉 &lt; 5 檔的薄類。點題材列展開成分股,TV 鈕匯出該題材清單。大類篩選用本頁的下拉,上方族群下拉不作用。</div>
+</div>
+
 <div class="view" id="v-scan" style="display:none;">
   <div class="crumb">
     <label class="filt mode">模式 <select id="scanMode">
@@ -184,7 +208,7 @@
   <div class="tbl-wrap">
   <table id="scanTbl">
     <thead><tr>
-      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="close">收盤</th>
+      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="tag">題材</th><th data-sk="close">收盤</th>
       <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th><th data-sk="vq">量縮</th><th data-sk="p10">距10高%</th><th data-sk="lh">腿高%</th>
       <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th>
       <th data-sk="m3">3m%</th><th data-sk="m6">6m%</th><th data-sk="m12">12m%</th>
@@ -245,6 +269,15 @@
     </table>
     <div class="gloss-note">三種模式共用上面這組底層條件,差別只在專屬條件:<b>收縮中</b> = 動能腿後短線整理(1w 在帶內 + 當日小幅),旗形候選;<b>今日突破</b> = 昨日仍在收縮帶、今日大漲;<b>全部動能股</b> = 只過底層條件。族群下拉不作用於本頁,搜尋可用。</div>
 
+    <h4>題材榜（MoneyDJ 細產業）</h4>
+    <dl>
+      <dt>題材</dt><dd>MoneyDJ 的細產業分類(1062 類,832 類有成分股),比 CMoney 的 87 個子類股細一個量級,且補得到 CMoney 沒有的 AI 伺服器、低軌衛星、重電、儲能、光通訊、銅箔基板。<b>多重歸屬</b>:一檔平均屬 3.5 類(鴻海 32 類、聯發科 13 類)。</dd>
+      <dt>漲幅為何用中位數</dt><dd>多重歸屬下同一檔會同時出現在它所屬的每一類,若照成交金額加權,一檔權值股就能同時帶動十幾個題材,看起來像一排題材同時發動。改用成分股漲幅<b>中位數</b>:單檔綁架不了整個題材,而且多重歸屬反而變成特性 —— 一檔本來就可以同時是 AI 伺服器和機器人概念。</dd>
+      <dt>檔數 ≥ N</dt><dd>細產業檔數中位數只有 4,兩三檔的類噪音太大,預設濾掉 &lt; 5 檔。</dd>
+      <dt>題材欄(掃描頁)</dt><dd>該檔的題材標籤,排序分數 = <code>該檔在題材內的成交金額占比 × (1 − 1/檔數)</code> —— 純占比會把「只有它一檔」的冷僻類頂到最前,純題材大小又會讓配角題材壓過主業。顯示前 2 個,hover 看全部。</dd>
+      <dt>跟 CMoney 子類股的關係</dt><dd>互補,不取代。左邊各頁的「類股」仍是 CMoney 單一歸屬 + 成交金額加權(權重和 100%,加權漲幅才有意義);題材榜是另一個切面。⚠️ 兩邊的分類代碼撞號但不同義(CMoney C23010=IC-設計、MoneyDJ C023010=中小尺吋面板),要對照只能用股票代號。</dd>
+    </dl>
+
     <h4>市場趨勢 / 頁首燈號</h4>
     <dl>
       <dt>🟢 / 🔴 燈號</dt><dd>加權、櫃買各自的 MA3 vs MA9 交叉:🟢 MA3 &gt; MA9 可進攻、🔴 MA3 &lt; MA9 不開新倉。指數圖底部柱狀 = MA3 − MA9(綠正紅負,獨立比例尺)。</dd>
@@ -259,6 +292,7 @@
 <div id="toast"></div>
 <script src="data.js"></script>
 <script src="scanner.js"></script>
+<script src="themes.js"></script>
 <script>
 const R = window.REPORT;
 const METRICS = ['d','w1','m1','m3','m6','m12'];
@@ -550,8 +584,101 @@ document.getElementById('scMinT').oninput = renderScatter;
 document.getElementById('scX').onchange = renderScatter;
 document.getElementById('scY').onchange = renderScatter;
 
+// ---------- 題材榜(MoneyDJ 細產業) ----------
+const TH_LIST = ((window.THEMES || {}).list) || [];
+// id -> 個股(含 market,TV 匯出與展開列都要)
+const STK = new Map();
+for (const s of R.sectors) for (const x of s.stocks) if (!STK.has(x.id)) STK.set(x.id, x);
+// id -> [題材名],排序分數 = 該檔在題材內的成交金額占比 × (1 − 1/檔數)。
+// 純占比排會把「只有它一檔」的冷僻類頂到最前(南亞的『丁二醇』、鴻海的『語音助理』),
+// 純題材大小排又會讓配角題材壓過主業(南亞的『印刷電路板相關』壓過『塑化原料』)。
+// (1 − 1/n) 讓單檔類歸零、雙檔類打對折,答的是「這檔在哪個「有同伴的」題材裡是主角」。
+const TAGS = new Map();
+{
+  const tmp = new Map();
+  for (const t of TH_LIST) for (const id of t.ids) {
+    if (!tmp.has(id)) tmp.set(id, []);
+    const share = t.turnover > 0 ? ((STK.get(id) || {}).turnover || 0) / t.turnover : 0;
+    tmp.get(id).push({ name: t.name, w: share * (1 - 1 / t.n) });
+  }
+  for (const [id, arr] of tmp) TAGS.set(id, arr.sort((a, b) => b.w - a.w).map(x => x.name));
+}
+let thSortKey = 'd', thSortDir = -1, thExpanded = new Set();
+[...new Set(TH_LIST.map(t => t.g))].sort().forEach(g => {
+  const o = document.createElement('option'); o.value = o.textContent = g;
+  document.getElementById('thGrp').appendChild(o);
+});
+function thFiltered() {
+  const minN = +document.getElementById('thMinN').value || 0;
+  const minT = (+document.getElementById('thMinT').value || 0) * 1e8;
+  const grp = document.getElementById('thGrp').value;
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  return TH_LIST.filter(t => {
+    if (t.n < minN || t.turnover < minT) return false;
+    if (grp && t.g !== grp) return false;
+    if (q && !(t.name.toLowerCase().includes(q) || t.g.includes(q) ||
+      t.ids.some(id => id.includes(q) || ((STK.get(id) || {}).name || '').toLowerCase().includes(q)))) return false;
+    return true;
+  });
+}
+function renderTheme() {
+  document.querySelectorAll('#thTbl th[data-tk]').forEach(th => {
+    if (!th.dataset.label) th.dataset.label = th.textContent;
+    th.textContent = th.dataset.label + (th.dataset.tk === thSortKey ? (thSortDir === -1 ? ' ▼' : ' ▲') : '');
+  });
+  const rows = thFiltered().slice().sort((a, b) => {
+    const va = a[thSortKey], vb = b[thSortKey];
+    if (typeof va === 'string') return va.localeCompare(vb, 'zh-TW') * -thSortDir;
+    return ((va ?? -9999) - (vb ?? -9999)) * thSortDir;
+  });
+  document.getElementById('thCount').textContent = rows.length + ' / ' + TH_LIST.length + ' 題材';
+  document.querySelector('#thTbl tbody').innerHTML = rows.map(t => {
+    const open = thExpanded.has(t.name);
+    let h = '<tr class="sector" data-th="' + t.name + '">' +
+      '<td><span class="arrow">' + (open ? '▼' : '▶') + '</span> ' + t.name +
+      '<button class="tvbtn" data-thtv="' + t.name + '" title="匯出 TradingView 清單">TV</button></td>' +
+      '<td>' + t.g + '</td>' +
+      '<td class="num">' + t.n + '</td>' +
+      '<td class="num">' + (t.turnover / 1e8).toFixed(1) + '</td>' +
+      METRICS.map(k => cellSec(t[k], k)).join('') + '</tr>';
+    if (open) {
+      h += t.ids.map(id => STK.get(id)).filter(Boolean)
+        .sort((a, b) => b.turnover - a.turnover)
+        .map(x => '<tr class="stock"><td>' + x.id + ' ' + x.name + '</td><td></td>' +
+          '<td class="num">' + x.close + '</td>' +
+          '<td class="num">' + (x.turnover / 1e8).toFixed(1) + '</td>' +
+          METRICS.map(k => cellStk(x[k], k)).join('') + '</tr>').join('');
+    }
+    return h;
+  }).join('');
+}
+const themeAsSector = name => {
+  const t = TH_LIST.find(x => x.name === name);
+  return t ? { name: t.name, stocks: t.ids.map(id => STK.get(id)).filter(Boolean) } : null;
+};
+document.querySelectorAll('#thTbl th[data-tk]').forEach(th => th.onclick = () => {
+  const k = th.dataset.tk;
+  if (thSortKey === k) thSortDir *= -1; else { thSortKey = k; thSortDir = -1; }
+  renderTheme();
+});
+document.querySelector('#thTbl tbody').onclick = e => {
+  if (e.target.classList.contains('tvbtn')) { exportTv([themeAsSector(e.target.dataset.thtv)]); return; }
+  const tr = e.target.closest('tr.sector');
+  if (!tr) return;
+  thExpanded.has(tr.dataset.th) ? thExpanded.delete(tr.dataset.th) : thExpanded.add(tr.dataset.th);
+  renderTheme();
+};
+document.getElementById('thMinN').oninput = renderTheme;
+document.getElementById('thMinT').oninput = renderTheme;
+document.getElementById('thGrp').onchange = renderTheme;
+
 // ---------- 突破掃描 ----------
 const SC = (window.SCANNER || {}).stocks || [];
+for (const x of SC) {
+  const tg = TAGS.get(x.id) || [];
+  x.tag = tg.join('・');
+  x.tagShort = tg.slice(0, 2).join('・') + (tg.length > 2 ? ' +' + (tg.length - 2) : '');
+}
 let scanSortKey = 'm3', scanSortDir = -1;
 const scanVal = id => +document.getElementById(id).value;
 function updateScanMarks() {
@@ -599,6 +726,7 @@ function renderScan() {
   document.querySelector('#scanTbl tbody').innerHTML = rows.slice(0, 200).map(x =>
     '<tr><td>' + x.id + ' ' + x.name + '</td>' +
     '<td>' + x.sec + '</td>' +
+    '<td class="tagcell"' + (x.tag ? ' title="' + x.tag + '"' : '') + '>' + (x.tagShort || '') + '</td>' +
     '<td class="num">' + x.close + '</td>' +
     '<td class="num">' + (x.turnover / 1e8).toFixed(1) + '</td>' +
     '<td class="num">' + (x.adr == null ? '--' : x.adr.toFixed(1)) + '</td>' +
@@ -757,12 +885,13 @@ function renderTrend() {
 
 // ---------- 共用 ----------
 let view = 'table';
-const HINTS = { table: '點欄位標題排序,點類股列展開成份股', map: '', scatter: '', scan: '', trend: '' };
+const HINTS = { table: '點欄位標題排序,點類股列展開成份股', map: '', scatter: '', theme: '點題材列展開成分股,TV 鈕匯出該題材', scan: '', trend: '' };
 function render() {
   document.getElementById('hint').textContent = HINTS[view];
   if (view === 'table') renderTable();
   else if (view === 'map') renderMap();
   else if (view === 'scatter') renderScatter();
+  else if (view === 'theme') renderTheme();
   else if (view === 'scan') renderScan();
   else renderTrend();
 }
@@ -771,7 +900,7 @@ document.getElementById('tabs').onclick = e => {
   if (!b) return;
   view = b.dataset.v;
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
-  for (const v of ['table', 'map', 'scatter', 'scan', 'trend']) document.getElementById('v-' + v).style.display = v === view ? '' : 'none';
+  for (const v of ['table', 'map', 'scatter', 'theme', 'scan', 'trend']) document.getElementById('v-' + v).style.display = v === view ? '' : 'none';
   render();
 };
 [...new Set(R.sectors.map(s => s.parent))].forEach(p => {

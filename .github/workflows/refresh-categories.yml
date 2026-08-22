@@ -2,7 +2,7 @@ name: Refresh sector categories
 
 on:
   schedule:
-    # 每月 1 日 17:30 台北時間,更新 CMoney 類股成份
+    # 每月 1 日 17:30 台北時間,更新 CMoney 類股成份 + MoneyDJ 題材分類
     - cron: '30 9 1 * *'
   workflow_dispatch:
 
@@ -27,6 +27,13 @@ jobs:
       - name: Scrape categories
         run: node scripts/scrape_categories.mjs
 
+      # MoneyDJ 是次要來源(題材標籤/題材榜),掛掉不該連累主線的 CMoney 分類更新 ——
+      # 但也不能靜默:資料照 commit,最後一步再把整個 run 弄紅。
+      - name: Scrape MoneyDJ industries
+        id: mdj
+        continue-on-error: true
+        run: node scripts/scrape_moneydj.mjs
+
       - name: Build report
         run: node scripts/build_report.mjs
 
@@ -34,8 +41,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/categories.json docs README.md
+          git add data/categories.json data/moneydj.json docs README.md
           git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "Refresh categories $(TZ=Asia/Taipei date +%F)"
           git pull --rebase
           git push
+
+      - name: Fail if MoneyDJ scrape failed
+        if: steps.mdj.outcome == 'failure'
+        run: |
+          echo "::error::MoneyDJ 題材分類這輪沒更新(CMoney 分類與報表已正常 commit,題材榜會沿用上次的分類)"
+          exit 1

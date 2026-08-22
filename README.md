@@ -98,4 +98,4 @@
 | 電子上游 | [ABF](https://www.cmoney.tw/forum/category/C30021) | 3 | 521.1 | -4.84 | -1.90 | 16.13 | 29.91 | 192.27 | 680.63 |
 | 電子下游 | [太陽能](https://www.cmoney.tw/forum/category/C23415) | 17 | 51.7 | -5.18 | -6.01 | -18.31 | 22.02 | 52.26 | 67.93 |
 
-> 資料來源:TWSE / TPEX 每日收盤行情與除權息參考價;類股分類:CMoney
+> 資料來源:TWSE / TPEX 每日收盤行情與除權息參考價;類股分類:CMoney;題材分類:MoneyDJ 細產業

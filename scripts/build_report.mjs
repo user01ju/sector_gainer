@@ -332,7 +332,7 @@ writeFileSync(join(ROOT, 'README.md'), `# 台股類股漲幅報表
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 ${mdRows}
 
-> 資料來源:TWSE / TPEX 每日收盤行情與除權息參考價;類股分類:CMoney
+> 資料來源:TWSE / TPEX 每日收盤行情與除權息參考價;類股分類:CMoney;題材分類:MoneyDJ 細產業
 `, 'utf8');
 
 // ---------- docs/data.js(靜態頁 docs/index.html 以 <script src=data.js> 載入,file:// 也可用) ----------
@@ -417,5 +417,40 @@ for (const [id, s] of series) {
 }
 writeFileSync(join(ROOT, 'docs', 'scanner.js'),
   'window.SCANNER=' + JSON.stringify({ date: latestDate, stocks: scanStocks }) + ';', 'utf8');
+
+// ---------- docs/themes.js(MoneyDJ 細產業:題材標籤 + 題材熱度榜) ----------
+// MoneyDJ 一檔平均屬 3.5 個細產業(鴻海 32 個),多重歸屬不能用成交金額加權 —— 同一檔會同時
+// 帶動它所屬的每一類,看起來像一排題材同時發動。改用成分股漲幅「中位數」:單檔綁架不了整個
+// 題材,且多重歸屬反而變成特性(一檔本來就可以同時是 AI 伺服器和機器人概念)。
+// 細產業中位數只有 4 檔,太薄的類噪音大,由前端用「檔數 ≥ N」自行過濾(這裡全部輸出)。
+if (existsSync(join(ROOT, 'data', 'moneydj.json'))) {
+  const mdj = JSON.parse(readFileSync(join(ROOT, 'data', 'moneydj.json'), 'utf8'));
+  const median = vals => {
+    const a = vals.filter(v => v != null).sort((x, y) => x - y);
+    if (!a.length) return null;
+    const h = a.length >> 1;
+    return +(a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2).toFixed(2);
+  };
+  const mcache = new Map();
+  const met = id => {
+    if (!mcache.has(id)) mcache.set(id, stockMetrics(id));
+    return mcache.get(id);
+  };
+  const themes = [];
+  for (const sub of mdj.subs) {
+    const mem = sub.stocks.filter(id => met(id));
+    if (!mem.length) continue;
+    const row = {
+      name: sub.name, g: sub.gname.replace(/類$/, ''), n: mem.length,
+      turnover: mem.reduce((a, id) => a + (met(id).turnover || 0), 0), ids: mem,
+    };
+    for (const k of METRICS) row[k] = median(mem.map(id => met(id)[k]));
+    themes.push(row);
+  }
+  themes.sort((a, b) => b.turnover - a.turnover);   // 標籤依成交金額排,個股的第一個標籤就是它最主流的題材
+  writeFileSync(join(ROOT, 'docs', 'themes.js'),
+    'window.THEMES=' + JSON.stringify({ date: latestDate, updated: mdj.updated, list: themes }) + ';', 'utf8');
+  console.error(`themes: ${themes.length} 個 MoneyDJ 細產業有成分股(來源 ${mdj.subs.length} 個,分類更新於 ${mdj.updated})`);
+}
 
 console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} scan stocks -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);

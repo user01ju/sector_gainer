@@ -357,7 +357,7 @@ function checkReportSchema() {
     if (m && !['green', 'red'].includes(m.light)) problems.push(`market.${k}.light=${m?.light}`);
   }
   // 網站讀的是 data.js 不是 report.json,兩者不同步 = 線上頁面靜默停在舊資料
-  for (const [f, re] of [['data.js', /window\.REPORT=\{"date":"(\d{4}-\d{2}-\d{2})"/], ['scanner.js', /window\.SCANNER=\{"date":"(\d{4}-\d{2}-\d{2})"/]]) {
+  for (const [f, re] of [['data.js', /window\.REPORT=\{"date":"(\d{4}-\d{2}-\d{2})"/], ['scanner.js', /window\.SCANNER=\{"date":"(\d{4}-\d{2}-\d{2})"/], ['themes.js', /window\.THEMES=\{"date":"(\d{4}-\d{2}-\d{2})"/]]) {
     const p = join(ROOT, 'docs', f);
     if (!existsSync(p)) { problems.push(`docs/${f} 不存在`); continue; }
     const m = readFileSync(p, 'utf8').slice(0, 200).match(re);
@@ -366,7 +366,7 @@ function checkReportSchema() {
   }
   return problems.length
     ? ['FAIL', `report.json/docs 產物結構:${problems.slice(0, 4).join(' ; ')}`]
-    : ['PASS', `report.json ${r.sectors.length} 類股、breadth ${r.breadth.dates.length} 點,docs/data.js 與 scanner.js 日期同步於 ${r.date}`];
+    : ['PASS', `report.json ${r.sectors.length} 類股、breadth ${r.breadth.dates.length} 點,docs/data.js / scanner.js / themes.js 日期同步於 ${r.date}`];
 }
 
 // market_index.csv 同時是四個 repo 的交易日曆來源,壞了會連帶讓別人的驗證失準
