@@ -8,7 +8,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'data', 'exrights.csv');
+// 輸出路徑可用 EXRIGHTS_OUT 覆寫:capital_stock_api 的 screener 自己抓一份到它的 data/,
+// 免得在本 repo 的工作區留下未 commit 的改動,害 update_report.bat 的 git pull --ff-only 掛掉。
+const OUT = process.env.EXRIGHTS_OUT || join(ROOT, 'data', 'exrights.csv');
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0', 'Accept': 'application/json' };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -111,7 +113,7 @@ function save(map) {
 }
 
 async function main() {
-  mkdirSync(join(ROOT, 'data'), { recursive: true });
+  mkdirSync(dirname(OUT), { recursive: true });
   const args = process.argv.slice(2);
   const days = args[0] === '--backfill' ? parseInt(args[1] || '370', 10) : 0;
   const today = taipeiToday();
