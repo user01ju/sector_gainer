@@ -20,8 +20,8 @@
 | 電子中游 | [散熱零組件](https://www.cmoney.tw/forum/category/C30024) | 10 | 211.8 | 5.23 | 23.36 | 54.29 | 27.77 | 42.00 | 121.13 |
 | 電子上游 | [半導體元件](https://www.cmoney.tw/forum/category/C30017) | 5 | 242.2 | 4.79 | 20.81 | 88.92 | 31.65 | 162.86 | 414.22 |
 | 電子中游 | [二次電池](https://www.cmoney.tw/forum/category/C30023) | 5 | 50.4 | 4.48 | 19.38 | 35.84 | -3.46 | 27.71 | 13.60 |
-| 傳產 | [汽車](https://www.cmoney.tw/forum/category/C22010) | 8 | 7.5 | 4.44 | 7.11 | 9.70 | 14.18 | 1.68 | -2.89 |
 | 電子上游 | [IC-封測](https://www.cmoney.tw/forum/category/C23060) | 28 | 901.3 | 4.16 | 11.87 | 29.08 | 2.21 | 62.30 | 214.78 |
+| 傳產 | [汽車](https://www.cmoney.tw/forum/category/C22010) | 9 | 8.2 | 4.05 | 6.40 | 9.70 | 14.18 | 1.68 | -2.89 |
 | 電子上游 | [PCB-製造](https://www.cmoney.tw/forum/category/C23120) | 39 | 905.4 | 4.02 | 18.53 | 45.13 | 11.12 | 115.42 | 219.40 |
 | 電子下游 | [工業電腦](https://www.cmoney.tw/forum/category/C23330) | 25 | 47.6 | 3.92 | 4.28 | 19.13 | 28.27 | 94.67 | 86.92 |
 | 電子上游 | [IC-製造](https://www.cmoney.tw/forum/category/C23050) | 6 | 60.8 | 3.80 | 14.03 | 32.96 | 0.10 | 77.48 | 151.03 |
@@ -69,9 +69,9 @@
 | 電子中游 | [PC介面卡](https://www.cmoney.tw/forum/category/C23220) | 3 | 0.3 | 0.02 | 0.83 | 9.41 | -18.18 | 10.28 | -11.20 |
 | 傳產 | [塑膠](https://www.cmoney.tw/forum/category/C13010) | 34 | 496.2 | -0.04 | 23.63 | 38.94 | 88.25 | 111.69 | 323.54 |
 | 電子中游 | [主機板](https://www.cmoney.tw/forum/category/C23190) | 9 | 48.6 | -0.04 | 6.02 | 13.86 | -0.26 | 63.74 | 87.18 |
-| 傳產 | [食品](https://www.cmoney.tw/forum/category/C12010) | 33 | 11.9 | -0.07 | -1.59 | 2.41 | 5.50 | 6.62 | 2.57 |
+| 傳產 | [食品](https://www.cmoney.tw/forum/category/C12010) | 32 | 11.8 | -0.08 | -1.76 | 2.21 | 5.72 | 6.07 | 0.96 |
 | 傳產 | [觀光](https://www.cmoney.tw/forum/category/C27010) | 49 | 2.8 | -0.09 | 0.64 | 6.37 | 8.88 | 4.89 | 1.50 |
-| 電子上游 | [DRAM銷售](https://www.cmoney.tw/forum/category/C23040) | 9 | 68.5 | -0.09 | -0.68 | 11.02 | -11.40 | 63.42 | 338.48 |
+| 電子上游 | [DRAM銷售](https://www.cmoney.tw/forum/category/C23040) | 10 | 68.6 | -0.09 | -0.65 | 11.04 | -11.40 | 63.40 | 338.11 |
 | 傳產 | [航運](https://www.cmoney.tw/forum/category/C26010) | 36 | 119.1 | -0.15 | -5.13 | 16.43 | 19.71 | 23.76 | 26.35 |
 | 傳產 | [其他](https://www.cmoney.tw/forum/category/C29020) | 108 | 40.5 | -0.19 | 1.75 | 16.03 | 11.19 | 22.21 | 16.84 |
 | 電子下游 | [電信服務](https://www.cmoney.tw/forum/category/C23320) | 3 | 26.5 | -0.23 | -0.31 | 0.05 | 4.19 | 10.00 | 11.82 |
