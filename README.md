@@ -31,12 +31,12 @@
 | 電子中游 | [NB與手機零組件](https://www.cmoney.tw/forum/category/C23210) | 11 | 114.3 | 2.17 | -1.22 | 2.93 | 34.45 | 66.94 | 242.79 |
 | 傳產 | [綠能環保](https://www.cmoney.tw/forum/category/C30013) | 23 | 8.0 | 1.98 | 3.94 | 7.63 | 4.07 | 20.07 | 86.08 |
 | 電子下游 | [筆記型電腦](https://www.cmoney.tw/forum/category/C23380) | 10 | 195.7 | 1.90 | 1.64 | 1.08 | 15.82 | 46.49 | 31.59 |
-| 電子中游 | [LCD-零組件](https://www.cmoney.tw/forum/category/C23150) | 15 | 14.5 | 1.88 | 12.14 | 15.95 | 5.04 | 12.16 | 44.56 |
 | 電子下游 | [手機製造](https://www.cmoney.tw/forum/category/C23410) | 3 | 10.5 | 1.86 | 4.53 | 6.85 | 0.57 | 10.15 | -26.26 |
 | 傳產 | [汽車零組件](https://www.cmoney.tw/forum/category/C22020) | 55 | 16.3 | 1.84 | 5.32 | 13.28 | 1.83 | 27.85 | 26.38 |
 | 傳產 | [自行車](https://www.cmoney.tw/forum/category/C29030) | 6 | 8.3 | 1.80 | 15.42 | 15.00 | 9.87 | 46.69 | 57.41 |
 | 電子上游 | [IC-其他](https://www.cmoney.tw/forum/category/C23080) | 10 | 31.0 | 1.75 | 2.95 | 4.01 | 3.08 | 23.51 | 122.84 |
 | 電子下游 | [電信服務](https://www.cmoney.tw/forum/category/C23320) | 3 | 22.9 | 1.62 | -0.01 | 6.13 | 6.94 | 14.43 | 15.43 |
+| 電子中游 | [LCD-零組件](https://www.cmoney.tw/forum/category/C23150) | 16 | 15.8 | 1.59 | 11.09 | 15.95 | 5.04 | 12.16 | 44.56 |
 | 電子上游 | [PCB-材料設備](https://www.cmoney.tw/forum/category/C23130) | 29 | 413.6 | 1.57 | 2.30 | 2.06 | 12.48 | 137.90 | 290.84 |
 | 電子中游 | [電源供應器](https://www.cmoney.tw/forum/category/C23170) | 22 | 157.2 | 1.49 | 0.41 | 0.69 | 0.69 | 45.70 | 115.45 |
 | 電子上游 | [IC-封測](https://www.cmoney.tw/forum/category/C23060) | 28 | 549.5 | 1.43 | 0.46 | 8.99 | -3.10 | 86.29 | 219.74 |
@@ -66,7 +66,7 @@
 | 電子中游 | [變壓器與UPS](https://www.cmoney.tw/forum/category/C23180) | 7 | 13.9 | -0.15 | 12.43 | 15.41 | 4.96 | 14.38 | -4.12 |
 | 傳產 | [食品](https://www.cmoney.tw/forum/category/C12010) | 32 | 7.0 | -0.16 | -0.51 | -2.65 | 1.34 | 2.09 | -4.60 |
 | 電子中游 | [通訊設備](https://www.cmoney.tw/forum/category/C23250) | 29 | 67.9 | -0.31 | -2.89 | -4.39 | 14.51 | 11.36 | 197.18 |
-| 傳產 | [百貨](https://www.cmoney.tw/forum/category/C29010) | 29 | 9.1 | -0.39 | -0.33 | -2.29 | -0.70 | 11.32 | 7.48 |
+| 傳產 | [百貨](https://www.cmoney.tw/forum/category/C29010) | 30 | 9.1 | -0.39 | -0.33 | -2.29 | -0.70 | 11.32 | 7.48 |
 | 傳產 | [營建](https://www.cmoney.tw/forum/category/C25010) | 86 | 13.4 | -0.40 | -1.31 | -4.25 | 3.24 | 10.80 | 5.69 |
 | 電子中游 | [聲學元件](https://www.cmoney.tw/forum/category/C30025) | 3 | 0.0 | -0.41 | 0.17 | -6.30 | -16.43 | -4.32 | 11.09 |
 | 電子中游 | [電子元件通路](https://www.cmoney.tw/forum/category/C30027) | 2 | 0.3 | -0.42 | 1.17 | -12.28 | -10.63 | 1.17 | 12.82 |
@@ -75,9 +75,9 @@
 | 傳產 | [運動休閒](https://www.cmoney.tw/forum/category/C30011) | 11 | 0.8 | -0.63 | -0.78 | -4.48 | -0.26 | 13.39 | -5.25 |
 | 傳產 | [照明](https://www.cmoney.tw/forum/category/C30014) | 3 | 0.3 | -0.75 | 2.00 | -9.80 | 0.10 | 131.65 | 169.45 |
 | 電子中游 | [二次電池](https://www.cmoney.tw/forum/category/C30023) | 5 | 12.6 | -0.75 | 3.51 | -4.45 | -2.60 | 13.38 | 5.24 |
+| 電子中游 | [儀器設備工程](https://www.cmoney.tw/forum/category/C23240) | 41 | 316.2 | -0.78 | 2.54 | 14.87 | -1.38 | 88.33 | 142.82 |
 | 傳產 | [航運](https://www.cmoney.tw/forum/category/C26010) | 36 | 49.5 | -0.80 | -1.26 | -0.47 | 19.66 | 24.70 | 30.29 |
 | 金融 | [銀行](https://www.cmoney.tw/forum/category/C28020) | 9 | 22.1 | -0.87 | -1.36 | 4.81 | 13.10 | 24.73 | 23.29 |
-| 電子中游 | [儀器設備工程](https://www.cmoney.tw/forum/category/C23240) | 39 | 292.6 | -0.93 | 3.27 | 14.87 | -1.38 | 88.33 | 142.82 |
 | 傳產 | [紡織纖維](https://www.cmoney.tw/forum/category/C14010) | 55 | 11.8 | -0.94 | -0.33 | -5.87 | -3.31 | 9.93 | 5.09 |
 | 電子上游 | [半導體元件](https://www.cmoney.tw/forum/category/C30017) | 5 | 67.3 | -1.02 | -1.06 | -16.20 | 45.12 | 76.45 | 456.90 |
 | 電子中游 | [磁碟陣列](https://www.cmoney.tw/forum/category/C30022) | 3 | 0.6 | -1.04 | -1.28 | -0.91 | -15.13 | 4.80 | 77.85 |
