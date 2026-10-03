@@ -76,12 +76,12 @@ async function main() {
   if (fail > subs.length * 0.05) throw new Error(`失敗 ${fail}/${subs.length} 筆(>5%) - 不寫檔`);
   if (!total) throw new Error('一檔成分股都沒抓到 - 不寫檔');
 
-  // 部分改版防呆(比照 scrape_categories.mjs):跟現有檔比,總筆數掉 >15% 或原本非空的分類變空就中止
+  // 部分改版防呆(比照 scrape_categories.mjs):跟現有檔比,總筆數掉 >15% 或原本 >=3 檔的分類變空就中止(單檔分類被改歸類很常見,不算改版)
   const dest = join(ROOT, 'data', 'moneydj.json');
   if (existsSync(dest)) {
     const prev = JSON.parse(readFileSync(dest, 'utf8'));
     const prevTotal = prev.subs.reduce((s, x) => s + x.stocks.length, 0);
-    const prevNonEmpty = new Set(prev.subs.filter(x => x.stocks.length).map(x => x.id));
+    const prevNonEmpty = new Set(prev.subs.filter(x => x.stocks.length >= 3).map(x => x.id));
     const wentEmpty = out.filter(x => !x.stocks.length && prevNonEmpty.has(x.id));
     if (total < prevTotal * 0.85 || wentEmpty.length) {
       throw new Error(`SANITY FAIL: 成分股 ${total} 筆(前次 ${prevTotal}),變空的分類:${wentEmpty.map(x => x.name).join(',') || '無'} - 不寫檔`);
