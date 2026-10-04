@@ -531,6 +531,39 @@ function checkHubFiles() {
   return problems.length ? ['FAIL', `資料 hub 產物:${problems.join(' ; ')}`] : ['PASS', `資料 hub 產物齊備:${ok.join('、')}`];
 }
 
+// daily-csv-schema 只看近 SCAN_DAYS 檔;這條掃全歷史。2026-10-04 稽核挖出首次回補(早於單邊缺漏防呆)
+// 留下的整個 TWSE 半邊缺檔 / 無 high/low 毒檔,躲了四個月。llm_wiki: backfill-predates-guardrails
+const HIST_TWSE_MIN = 500, HIST_TPEX_MIN = 300; // 同 fetch_daily.mjs 的單邊缺漏門檻
+function checkDailyHistoryCompleteness() {
+  const HEADER = 'id,name,market,close,change,turnover,high,low';
+  const dd = ctx.dailyDates;
+  if (!dd.length) return ['FAIL', 'data/daily 沒有任何檔案'];
+  const problems = [];
+  for (const d of dd) {
+    const lines = splitCsv(join(DAILY_DIR, `${d}.csv`));
+    let twse = 0, tpex = 0;
+    for (const ln of lines.slice(1)) {
+      const m = ln.split(',')[2];
+      if (m === 'TWSE') twse++; else if (m === 'TPEX') tpex++;
+    }
+    const why = [];
+    if (lines[0] !== HEADER) why.push('缺 high/low');
+    if (twse < HIST_TWSE_MIN) why.push(`TWSE ${twse}`);
+    if (tpex < HIST_TPEX_MIN) why.push(`TPEX ${tpex}`);
+    if (why.length) problems.push(`${d}(${why.join('/')})`);
+  }
+  if (problems.length) return ['FAIL', `全歷史 ${dd.length} 檔 daily 有 ${problems.length} 檔殘缺:${problems.slice(0, 6).join(' ; ')}${problems.length > 6 ? ' …' : ''} — 移走後 fetch_daily.mjs <日期> 重抓`];
+  return ['PASS', `全歷史 ${dd.length} 檔 daily(${dd[0]}~${dd[dd.length - 1]})皆有 high/low,TWSE>=${HIST_TWSE_MIN}、TPEX>=${HIST_TPEX_MIN}`];
+}
+
+// build_report 的毒日偵測會整天剔除、只印 stderr;容錯不能藏問題,剔除即 FAIL。
+function checkReportNoDroppedDays() {
+  const dropped = ctx.report.droppedDays;
+  if (!Array.isArray(dropped)) return ['FAIL', 'report.json 沒有 droppedDays 欄位(build_report.mjs 版本太舊?)'];
+  if (dropped.length) return ['FAIL', `build_report 剔除了 ${dropped.length} 個毒日:${dropped.join(', ')} — 交易所資料異常,移走該日 daily 檔後重抓`];
+  return ['PASS', 'build_report 未剔除任何交易日'];
+}
+
 // ---------------- Tier B(外部呼叫) ----------------
 
 let callsUsed = 0, lastCallAt = 0;
@@ -650,6 +683,8 @@ const TIER_A = [
   ['exrights-integrity', checkExrightsIntegrity],
   ['exrights-date-has-daily', checkExrightsDateHasDaily],
   ['hub-files-present', checkHubFiles],
+  ['daily-history-completeness', checkDailyHistoryCompleteness],
+  ['report-no-dropped-days', checkReportNoDroppedDays],
 ];
 
 const TIER_B = [

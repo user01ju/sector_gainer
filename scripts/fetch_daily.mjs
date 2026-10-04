@@ -108,7 +108,7 @@ async function fetchDay(date) {
 async function augmentDay(file) {
   const date = file.slice(0, 10);
   const path = join(OUT_DIR, file);
-  const lines = readFileSync(path, 'utf8').split('\n');
+  const lines = readFileSync(path, 'utf8').split(/\r?\n/); // CRLF 檔若只切 \n,\r 會夾在 turnover 與 high 之間
   if (lines[0].includes('high')) return 'done';
   const [twse, tpex] = [await fetchTwse(date), await fetchTpex(date)];
   const map = new Map([...twse, ...tpex].map(s => [s.id, s]));

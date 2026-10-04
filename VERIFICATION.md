@@ -20,7 +20,7 @@ exit code：`0` 全過（或只有 SKIP）／`1` 至少一條 FAIL／`2` 沒 FAI
 - **Tier A** → `.github/workflows/daily.yml`，位置在 `build_report.mjs` 之後、commit step 之前。**FAIL 擋掉 commit**。這點很關鍵：commit step 是 `git diff --cached --quiet && echo "no changes" && exit 0`，正是「TWSE 連續被擋 → CI 天天綠色 no changes → 報表默默停更」的元凶，驗證掛在它之前才有意義。
 - **Tier B** → `.github/workflows/verify.yml`，每日台北 21:00（UTC 13:00）獨立排程 + `workflow_dispatch`。排在本 repo 的 daily（台北 15~18:05）與 twse_website 的重試窗口之後。FAIL 只讓這個 workflow 紅。
 
-## Tier A（12 條，零外部呼叫）
+## Tier A（14 條，零外部呼叫）
 
 | check-id | 驗什麼 |
 |---|---|
@@ -36,6 +36,8 @@ exit code：`0` 全過（或只有 SKIP）／`1` 至少一條 FAIL／`2` 沒 FAI
 | `exrights-integrity` | 筆數／鍵唯一性／ref 對前收比值合理區間，**超區間再用當日成交價佐證** |
 | `exrights-date-has-daily` | 除權息日缺行情檔，**分辨休市順延 vs 真漏抓** |
 | `hub-files-present` | 資料 hub 四個產物齊備 |
+| `daily-history-completeness` | 全歷史 daily：TWSE>=500 / TPEX>=300 / header 有 high/low（2026-10-04 加：首次回補殘檔躲過只看近 10 檔的 schema 檢查） |
+| `report-no-dropped-days` | `report.json.droppedDays` 必須為空：build_report 毒日偵測整天剔除 = FAIL，別讓容錯藏住上游壞資料（2026-10-04 加） |
 
 幾個要點：
 

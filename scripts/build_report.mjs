@@ -330,7 +330,8 @@ if (existsSync(idxFile)) {
   if (taiex || otc) market = { taiex, otc };
 }
 
-const report = { date: latestDate, baseDates, market, breadth, sectors };
+const droppedDays = dates.filter((_, i) => dropped[i]); // verify.mjs report-no-dropped-days 會擋非空
+const report = { date: latestDate, baseDates, market, breadth, sectors, droppedDays };
 writeFileSync(join(ROOT, 'docs', 'report.json'), JSON.stringify(report), 'utf8');
 
 // ---------- README.md ----------
