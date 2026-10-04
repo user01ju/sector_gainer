@@ -19,8 +19,9 @@ const num = s => {
   return Number.isFinite(v) ? v : null;
 };
 const taipeiToday = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+// TPEX revivt/pvChgRslt 的日期是無分隔的 "1150825":分隔符必須可省,否則整個來源靜默 0 筆
 const rocToIso = s => {
-  const m = String(s).match(/^(\d{2,3})[年/](\d{2})[月/](\d{2})/);
+  const m = String(s).match(/^(\d{2,3})[年/]?(\d{2})[月/]?(\d{2})/);
   return m ? `${+m[1] + 1911}-${m[2]}-${m[3]}` : null;
 };
 
@@ -39,11 +40,15 @@ async function fetchJson(url, retries = 2) {
 
 // TWSE 三種特殊日參考價表 + TPEX 減資表,皆支援日期區間,按月查
 // 除權息 TWT49U、減資恢復買賣 TWTAUU、變更面額恢復買賣 TWTB8U(如國巨 1拆4)、TPEX 減資 revivt
+// 除權息用「減除股利參考價」(= 開盤競價基準,交易所算漲跌停用的那個),不用「除權息參考價」:
+// 後者連現金增資認股權的理論價值都扣掉,但盤面沒有那段缺口 -> 鏈上灌出假漲幅、跟 TradingView 線圖對不上
+// (6225 天瀚 2026-08-18:除權息參考價 30.04、開盤基準 44.40、當天漲停 48.80 -> 鏈上 +62%)。只還原股利。
 const RANGE_SOURCES = [
-  { tag: 'TWSE除權息', url: (s, e) => `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=${s}&endDate=${e}&response=json`, dateF: '資料日期', idF: '股票代號', refF: '除權息參考價' },
+  { tag: 'TWSE除權息', url: (s, e) => `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=${s}&endDate=${e}&response=json`, dateF: '資料日期', idF: '股票代號', refF: '減除股利參考價' },
   { tag: 'TWSE減資', url: (s, e) => `https://www.twse.com.tw/rwd/zh/reducation/TWTAUU?startDate=${s}&endDate=${e}&response=json`, dateF: '恢復買賣日期', idF: '股票代號', refF: '恢復買賣參考價' },
   { tag: 'TWSE面額變更', url: (s, e) => `https://www.twse.com.tw/rwd/zh/change/TWTB8U?startDate=${s}&endDate=${e}&response=json`, dateF: '恢復買賣日期', idF: '股票代號', refF: '恢復買賣參考價' },
   { tag: 'TPEX減資', url: (s, e) => `https://www.tpex.org.tw/www/zh-tw/bulletin/revivt?startDate=${s.slice(0, 4)}/${s.slice(4, 6)}/${s.slice(6)}&endDate=${e.slice(0, 4)}/${e.slice(4, 6)}/${e.slice(6)}&response=json`, dateF: '恢復買賣日期', idF: '股票代號', refF: '減資恢復買賣開始日參考價格' },
+  { tag: 'TPEX面額變更', url: (s, e) => `https://www.tpex.org.tw/www/zh-tw/bulletin/pvChgRslt?startDate=${s.slice(0, 4)}/${s.slice(4, 6)}/${s.slice(6)}&endDate=${e.slice(0, 4)}/${e.slice(4, 6)}/${e.slice(6)}&response=json`, dateF: '恢復買賣日期', idF: '證券代號', refF: '恢復買賣開始參考價' },
 ];
 
 async function fetchRangeSources(start, end) {
@@ -87,7 +92,7 @@ async function fetchTpexDay(date) {
     .map(r => {
       const date2 = rocToIso(r[fi['除權息日期']]);
       const id = String(r[fi['代號']]).trim();
-      const ref = num(r[fi['除權息參考價']]);
+      const ref = num(r[fi['減除股利參考價']]);   // 同上,只還原股利
       return date2 && /^\d{4}$/.test(id) && ref ? [date2, id, ref] : null;
     })
     .filter(Boolean);

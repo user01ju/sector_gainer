@@ -625,7 +625,7 @@ async function checkExrightsCrossTwseWebsite() {
   const cut = addDays(taipeiToday(), -EXRIGHTS_CROSS_DAYS);
   const dd = new Set(ctx.dailyDates);
   const last = ctx.dailyDates[ctx.dailyDates.length - 1];
-  let common = 0;
+  let common = 0, rightsOnly = 0;
   const mismatch = [], missing = [];
   for (const [k, ref] of up) {
     const [date] = k.split('|');
@@ -633,9 +633,17 @@ async function checkExrightsCrossTwseWebsite() {
     const mine = ctx.exMap.get(k);
     if (mine == null) { if (dd.has(date)) missing.push(k); continue; } // 只算「本地有行情卻沒參考價」的
     common++;
-    if (Math.abs(pct(mine, ref)) > EXREF_CROSS_TOL_PCT) mismatch.push(`${k} 本地 ${mine} vs 上游 ${ref}`);
+    if (Math.abs(pct(mine, ref)) <= EXREF_CROSS_TOL_PCT) continue;
+    // 本地用「減除股利參考價」(只還原股利),上游 twse_website 用「除權息參考價」(連現增認股權一起扣):
+    // 有現增的那幾筆本地必然落在「上游參考價」與「前收」之間(認購價高於市價時上游會比前收高,如 1312 國喬)。
+    // 跑出這個區間才是真的不一致。
+    const i = ctx.dailyDates.indexOf(date);
+    const prev = i > 0 ? ctx.dayMap(ctx.dailyDates[i - 1]).get(k.split('|')[1]) : null;
+    if (prev && mine >= Math.min(ref, prev.close) * 0.999 && mine <= Math.max(ref, prev.close) * 1.001) { rightsOnly++; continue; }
+    mismatch.push(`${k} 本地 ${mine} vs 上游 ${ref}`);
   }
-  const msg = `近 ${EXRIGHTS_CROSS_DAYS} 天:共同 ${common} 筆(參考價差 >${EXREF_CROSS_TOL_PCT}% 者 ${mismatch.length} 筆),` +
+  const msg = `近 ${EXRIGHTS_CROSS_DAYS} 天:共同 ${common} 筆(參考價差 >${EXREF_CROSS_TOL_PCT}% 者 ${mismatch.length} 筆;` +
+    `另 ${rightsOnly} 筆是現增認股權口徑差、介於上游與前收之間),` +
     `上游有、本地缺 ${missing.length} 筆(容差 0)`;
   if (mismatch.length) return ['FAIL', `exrights 交叉比對 ${msg} — ${mismatch.slice(0, 3).join(' ; ')}`];
   if (missing.length) return ['FAIL', `exrights 交叉比對 ${msg} — 漏抓會讓還原鏈吃到假跳空:${missing.slice(0, 5).join('、')}`];
