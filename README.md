@@ -46,7 +46,7 @@
 | 電子下游 | [數位相機](https://www.cmoney.tw/forum/category/C23290) | 4 | 1.9 | 1.56 | 14.11 | 4.75 | 58.54 | 82.47 | 104.27 |
 | 電子上游 | [IC-半導體設備](https://www.cmoney.tw/forum/category/C30015) | 24 | 152.8 | 1.53 | 5.01 | 3.97 | -2.84 | 34.11 | 173.23 |
 | 傳產 | [紡織纖維](https://www.cmoney.tw/forum/category/C14010) | 55 | 10.1 | 1.46 | 1.40 | -4.15 | -5.79 | 19.89 | 14.19 |
-| 電子上游 | [IC-設計](https://www.cmoney.tw/forum/category/C23010) | 82 | 489.2 | 1.42 | 2.83 | 19.33 | 6.87 | 151.88 | 199.43 |
+| 電子上游 | [IC-設計](https://www.cmoney.tw/forum/category/C23010) | 82 | 489.2 | 1.42 | 2.83 | 19.33 | 6.87 | 151.88 | 205.99 |
 | 金融 | [證券](https://www.cmoney.tw/forum/category/C28030) | 11 | 6.9 | 1.31 | 0.65 | 9.50 | 5.37 | 62.53 | 115.22 |
 | 傳產 | [航運](https://www.cmoney.tw/forum/category/C26010) | 36 | 51.5 | 1.30 | 0.10 | 1.22 | 23.45 | 28.51 | 34.25 |
 | 電子中游 | [主機板](https://www.cmoney.tw/forum/category/C23190) | 9 | 49.8 | 1.21 | 3.60 | 3.22 | 12.77 | 69.03 | 66.60 |
@@ -64,7 +64,7 @@
 | 電子下游 | [消費電子](https://www.cmoney.tw/forum/category/C23390) | 20 | 5.8 | 0.09 | 4.12 | 1.73 | -2.01 | 25.82 | 7.80 |
 | 電子中游 | [機殼](https://www.cmoney.tw/forum/category/C23230) | 19 | 38.0 | 0.06 | -2.18 | 0.86 | 0.25 | 17.20 | 41.65 |
 | 金融 | [保險](https://www.cmoney.tw/forum/category/C28040) | 7 | 0.9 | 0.04 | -1.76 | -0.92 | 16.08 | 45.26 | 66.01 |
-| 傳產 | [營建](https://www.cmoney.tw/forum/category/C25010) | 87 | 13.6 | -0.04 | -1.16 | -3.42 | 1.86 | 9.66 | 7.42 |
+| 傳產 | [營建](https://www.cmoney.tw/forum/category/C25010) | 87 | 13.6 | -0.04 | -1.16 | -3.42 | 1.86 | 9.66 | 7.41 |
 | 傳產 | [觀光](https://www.cmoney.tw/forum/category/C27010) | 47 | 1.7 | -0.09 | 0.49 | -0.89 | 1.17 | 4.45 | 0.68 |
 | 金融 | [銀行](https://www.cmoney.tw/forum/category/C28020) | 9 | 13.1 | -0.10 | -1.25 | 4.10 | 15.93 | 27.91 | 27.72 |
 | 金融 | [金控](https://www.cmoney.tw/forum/category/C28010) | 13 | 150.3 | -0.12 | -2.19 | 2.82 | 21.56 | 59.60 | 89.12 |
@@ -73,7 +73,7 @@
 | 電子中游 | [聲學元件](https://www.cmoney.tw/forum/category/C30025) | 3 | 0.1 | -0.19 | 0.03 | -4.26 | -15.51 | -5.08 | 10.06 |
 | 電子下游 | [工業電腦](https://www.cmoney.tw/forum/category/C23330) | 24 | 30.2 | -0.25 | 1.16 | 4.35 | 25.53 | 99.47 | 94.08 |
 | 電子中游 | [磁碟陣列](https://www.cmoney.tw/forum/category/C30022) | 3 | 0.5 | -0.46 | -1.64 | -0.83 | -18.80 | 16.00 | 78.79 |
-| 軟體 | [其他](https://www.cmoney.tw/forum/category/C23450) | 22 | 1.1 | -0.49 | -0.23 | -1.83 | 0.19 | 21.77 | -0.09 |
+| 軟體 | [其他](https://www.cmoney.tw/forum/category/C23450) | 22 | 1.1 | -0.49 | -0.23 | -1.83 | 0.19 | 21.88 | 0.02 |
 | 傳產 | [生技](https://www.cmoney.tw/forum/category/C17020) | 158 | 55.1 | -0.55 | 4.98 | 15.29 | 10.35 | 59.84 | 66.46 |
 | 軟體 | [系統整合](https://www.cmoney.tw/forum/category/C23430) | 58 | 15.7 | -0.57 | 2.05 | 16.84 | 16.77 | 55.88 | 39.87 |
 | 電子下游 | [電腦周邊](https://www.cmoney.tw/forum/category/C30028) | 12 | 4.5 | -0.63 | 0.41 | 0.63 | -1.67 | -3.20 | -14.12 |

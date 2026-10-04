@@ -87,6 +87,27 @@ const dropped = new Array(files.length).fill(false);
     for (const [id, { close }] of day) lastClose.set(id, close);
   });
 }
+
+// 個股在除權息日當天零成交(或該日被剔除):參考價順延到該股下一個保留日,否則配息缺口被當成下跌。
+// 實例:2947 2026-03-26 除權息當日無成交,次日 close/前收 把 80→78.9 的缺口算成 -1.37%。
+{
+  const idx = new Map(dates.map((d, i) => [d, i]));
+  const rolled = [];
+  for (const [key, ref] of [...exrights]) {
+    const [d, id] = key.split('|');
+    const i = idx.get(d);
+    if (i == null || (!dropped[i] && rawDays[i].has(id))) continue;
+    let j = i + 1;
+    while (j < dates.length && j - i <= 10 && (dropped[j] || !rawDays[j].has(id))) j++;
+    if (j >= dates.length || j - i > 10) continue;
+    const dst = `${dates[j]}|${id}`;
+    if (exrights.has(dst)) continue;
+    exrights.delete(key);
+    exrights.set(dst, ref);
+    rolled.push(`${d}->${dates[j]} ${id}`);
+  }
+  if (rolled.length) process.stderr.write(`除權息日順延(個股無成交) ${rolled.length} 筆: ${rolled.slice(0, 5).join(', ')}${rolled.length > 5 ? ' ...' : ''}\n`);
+}
 let T = files.length - 1;
 while (T >= 0 && dropped[T]) T--;
 const latestDate = dates[T];
