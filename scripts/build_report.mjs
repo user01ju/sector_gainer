@@ -9,7 +9,6 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { shape } from './setup_scan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DAILY = join(ROOT, 'data', 'daily');
@@ -363,10 +362,9 @@ writeFileSync(join(ROOT, 'docs', 'data.js'), 'window.REPORT=' + JSON.stringify(r
 
 // ---------- docs/scanner.js(Qullamaggie 原版動能掃描) ----------
 // 三組 C/MinL(126/67/22 根)全市場百分位排名,任一組 ≥ 95% 且 ADR20 > 4% 就輸出;
-// 量不設門檻。前端預設再濾 Rank ≥ 97 / ADR ≥ 5 / 量 ≥ 1 億。旗形與收縮看圖判斷,形狀指標只顯示不篩。
+// 量不設門檻。前端預設再濾 Rank ≥ 97 / ADR ≥ 5 / 量 ≥ 1 億。旗形與收縮看圖判斷。
 const MINL = { '6m': 126, '3m': 67, '1m': 22 };
 const RANK_MIN = 0.95, ADR_MIN = 4;
-const SETUP_BARS = 70;   // shape() 最多回看 63 根
 const stockNames = new Map(), stockSectors = new Map();
 for (const cat of categories) for (const st of cat.stocks) {
   stockNames.set(st.id, st.name);
@@ -396,17 +394,6 @@ for (const k of Object.keys(MINL)) {
     i = j + 1;
   }
 }
-// 還原 H/L/C 換算成今日價位(樞紐/停損可直接對盤面)。daily csv 沒有量欄,量用 成交金額/收盤 代理
-// (只用量的比值;大漲日會比真實量比略低估,約當日均價/收盤的差)
-function adjBars(s) {
-  const k = s.c[s.c.length - 1] / s.cum[s.cum.length - 1];
-  const H = [], L = [], C = [], V = [];
-  for (let j = Math.max(0, s.c.length - SETUP_BARS); j < s.c.length; j++) {
-    const f = s.cum[j] / s.c[j] * k;
-    H.push(s.h[j] * f); L.push(s.l[j] * f); C.push(s.cum[j] * k); V.push(s.to[j] / s.c[j]);
-  }
-  return [H, L, C, V];
-}
 const scanStocks = [];
 for (const { id, s, rank } of universe) {
   if (!Object.values(rank).some(x => x >= RANK_MIN)) continue;
@@ -414,8 +401,6 @@ for (const { id, s, rank } of universe) {
   const hl = s.h.slice(-20).map((x, j) => x / s.l[s.l.length - Math.min(20, s.l.length) + j] - 1).filter(x => x >= 0 && x < Infinity);   // 缺 high/low 的日子剔除
   const adr = hl.length >= 10 ? hl.reduce((a, b) => a + b, 0) / hl.length * 100 : null;
   if (!(adr > ADR_MIN)) continue;
-  const bars = adjBars(s);
-  const sh = bars.flat().some(x => !(x > 0)) ? null : shape(...bars);   // 缺 high/low 或零價就不算形狀
   const m = stockMetrics(id);
   let base = null;
   const spark = sparkSamples.map(idx => {
@@ -429,7 +414,6 @@ for (const { id, s, rank } of universe) {
     rank: Object.fromEntries(Object.keys(MINL).map(k => [k, rank[k] == null ? null : +(rank[k] * 100).toFixed(1)])),
     adr: +adr.toFixed(2),
     to20: +(s.to.slice(-20).reduce((a, x) => a + x, 0) / Math.min(20, s.to.length) / 1e8).toFixed(2),   // 量縮日當日額偏低,用 20 日均
-    shape: sh,
     ...Object.fromEntries(METRICS.map(k => [k, m[k] == null ? null : +m[k].toFixed(2)])),
     spark,
   });

@@ -200,17 +200,14 @@
   <table id="scanTbl">
     <thead><tr>
       <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="tag">題材</th><th data-sk="rk">動能組</th><th data-sk="close">收盤</th>
-      <th data-sk="to20">量20(億)</th><th data-sk="adr">ADR%</th><th data-sk="offHigh">距腿高%</th><th data-sk="daysOff">休(根)</th>
-      <th data-sk="tight">收縮</th><th data-sk="vq">量縮</th><th data-sk="rc">rc</th><th data-sk="pivot">樞紐</th><th data-sk="distAdr">距樞紐</th>
-      <th data-sk="stop">停損</th><th data-sk="riskPct">風險%</th><th data-sk="score">分數</th>
-      <th data-sk="d">漲%</th><th data-sk="volx">量倍</th>
-      <th data-sk="m1">1m%</th><th data-sk="m3">3m%</th><th data-sk="m6">6m%</th>
+      <th data-sk="to20">量20(億)</th><th data-sk="adr">ADR%</th>
+      <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th><th data-sk="m3">3m%</th><th data-sk="m6">6m%</th>
       <th class="nosort">1y 走勢</th>
     </tr></thead>
     <tbody></tbody>
   </table>
   </div>
-  <div class="legend">Qullamaggie 原版掃描:所選動能組的 C/MinL 全市場 Rank、ADR20、20 日均量三個濾網(資料只含任一組 Rank ≥ 95% 且 ADR &gt; 4% 的股票)。旗形看圖判斷;距腿高 ~ 量倍是形狀指標,只顯示不篩選,定義見下方名詞解釋。族群篩選不適用本頁,搜尋適用。</div>
+  <div class="legend">Qullamaggie 原版掃描:所選動能組的 C/MinL 全市場 Rank、ADR20、20 日均量三個濾網(資料只含任一組 Rank ≥ 95% 且 ADR &gt; 4% 的股票)。旗形看圖判斷。族群篩選不適用本頁,搜尋適用。</div>
 </div>
 
 <div class="view" id="v-trend" style="display:none;">
@@ -252,17 +249,9 @@
         <tr><td>動能組</td><td>6m / 3m / 1m 的 <code>還原收盤 / 近 126/67/22 根還原最低價</code>(Q 的 C/MinL)全市場百分位排名。下拉選組、Rank 濾網套在所選組;欄內列出達到濾網值的組別(滑過看三組 Rank)。</td><td>預設 ≥ 97(Q 原話前 1~2%)</td></tr>
         <tr><td>量20(億)</td><td>近 20 日平均成交金額。量縮整理期當日額會偏低,所以不用當日。</td><td>預設濾網 ≥ 1 億</td></tr>
         <tr><td>ADR%</td><td>近 20 日平均 <code>(最高/最低 − 1)</code>,Q 的定義。波動性 = 利潤潛力。</td><td>資料門檻 &gt; 4,預設濾網 ≥ 5</td></tr>
-        <tr><td>距腿高% / 休</td><td>今天距近 63 根還原高點的跌幅,以及高點後過了幾根。回太深不算旗形;休太短是還在噴、太長是長底不是旗形。</td><td>≥ −25%;3 ~ 40 根</td></tr>
-        <tr><td>收縮</td><td>近 5 日平均振幅 / ADR60。用 60 日當分母,收縮才不會自己拉低基準。</td><td>≤ 0.85</td></tr>
-        <tr><td>量縮</td><td>近 5 日均量 / 近 50 日均量。量用 成交金額 ÷ 收盤 代理。</td><td>≤ 0.9</td></tr>
-        <tr><td>rc</td><td>近 5 日高低區間 / 前 5 日區間,&lt; 1 = 越收越窄(VCP)。只計分不當門檻。</td><td>越小越好</td></tr>
-        <tr><td>樞紐 / 距樞紐</td><td>樞紐 = 近 10 日還原高(已換算成今日價位,可直接對盤面);距樞紐 = 收盤到樞紐的距離 ÷ ADR。另要求收盤站上 MA20 且 MA20 上彎、當日漲跌 ≤ 0.8 ADR。</td><td>≤ 2 ADR</td></tr>
-        <tr><td>停損 / 風險%</td><td>停損 = 近 5 日最低(上限參考,實際用進場日低 LOD);風險% = 樞紐到停損的距離。</td><td>越小部位可越大</td></tr>
-        <tr><td>分數</td><td><code>收縮 + 量縮 + 距樞紐/2 + min(rc, 2)</code>,越低 = 收縮越乾淨、越貼樞紐。</td><td>越低越好</td></tr>
-        <tr><td>漲% / 量倍</td><td>今日漲跌幅、今日量 / 前 50 日均量。</td><td>突破日量倍 ≥ 1.5</td></tr>
       </tbody>
     </table>
-    <div class="gloss-note">篩選只用 Qullamaggie 原版三項:動能 Rank、ADR、量。距腿高 ~ 量倍是形狀指標(定義沿用 capital_stock_api 的 setup_scan,門檻欄是它當條件時的值),本頁只顯示不篩選 —— 旗形要看圖。族群下拉不作用於本頁,搜尋可用。</div>
+    <div class="gloss-note">篩選只用 Qullamaggie 原版三項:動能 Rank、ADR、量。旗形、收縮、樞紐要看圖(1y 走勢 + 看盤軟體)。族群下拉不作用於本頁,搜尋可用。</div>
 
     <h4>題材榜（MoneyDJ 細產業）</h4>
     <dl>
@@ -667,13 +656,12 @@ document.getElementById('thMinN').oninput = renderTheme;
 document.getElementById('thMinT').oninput = renderTheme;
 document.getElementById('thGrp').onchange = renderTheme;
 
-// ---------- 突破掃描(Qullamaggie 原版動能清單;形狀欄位只顯示不篩) ----------
+// ---------- 突破掃描(Qullamaggie 原版動能清單) ----------
 const SC = (window.SCANNER || {}).stocks || [];
 for (const x of SC) {
   const tg = TAGS.get(x.id) || [];
   x.tag = tg.join('・');
   x.tagShort = tg.slice(0, 2).join('・') + (tg.length > 2 ? ' +' + (tg.length - 2) : '');
-  x.s = x.shape || {};   // 舊格式 scanner.js(快取)或不足 60 根:形狀欄顯示 --
   x.rank = x.rank || {};
 }
 let scanSortKey = 'rk', scanSortDir = -1;   // rk = 所選動能組的 Rank
@@ -688,7 +676,7 @@ function renderScan() {
   updateScanMarks();
   const q = document.getElementById('search').value.trim().toLowerCase();
   const MK = document.getElementById('scGrp').value, RK = scanVal('scRank'), VOL = scanVal('scVol'), ADR = scanVal('scAdr');
-  const val = (x, k) => k === 'rk' ? x.rank[MK] : k in x.s ? x.s[k] : x[k];
+  const val = (x, k) => k === 'rk' ? x.rank[MK] : x[k];
   const rows = SC.filter(x => {
     if (q && !(x.id.includes(q) || x.name.toLowerCase().includes(q) || x.sec.toLowerCase().includes(q))) return false;
     return x.rank[MK] >= RK && x.adr >= ADR && x.to20 >= VOL;
@@ -700,20 +688,16 @@ function renderScan() {
   });
   document.getElementById('scanCount').textContent = rows.length + ' 檔(輸出 ' + SC.length + ' / ' + ((window.SCANNER || {}).universe ?? '--') + ')';
   const num = (v, d) => '<td class="num">' + (v == null ? '--' : v.toFixed(d)) + '</td>';
-  document.querySelector('#scanTbl tbody').innerHTML = rows.map(x => {
-    const f = x.s;
-    return '<tr><td>' + x.id + ' ' + x.name + '</td>' +
+  document.querySelector('#scanTbl tbody').innerHTML = rows.map(x =>
+    '<tr><td>' + x.id + ' ' + x.name + '</td>' +
       '<td>' + x.sec + '</td>' +
       '<td class="tagcell"' + (x.tag ? ' title="' + x.tag + '"' : '') + '>' + (x.tagShort || '') + '</td>' +
       '<td class="num" title="' + Object.entries(x.rank).map(([k, r]) => k + ' Rank ' + (r ?? '--') + '%').join('&#10;') + '">' +
         Object.keys(x.rank).filter(k => x.rank[k] >= RK).join(' ') + '</td>' +
       '<td class="num">' + x.close + '</td>' +
-      num(x.to20, 1) + num(x.adr, 1) + num(f.offHigh, 1) + '<td class="num">' + (f.daysOff ?? '--') + '</td>' +
-      num(f.tight, 2) + num(f.vq, 2) + num(f.rc, 2) + num(f.pivot, 2) + num(f.distAdr, 2) +
-      num(f.stop, 2) + num(f.riskPct, 1) + num(f.score, 2) + num(x.d, 1) + num(f.volx, 2) +
-      ['m1', 'm3', 'm6'].map(k => cellStk(x[k], k)).join('') +
-      '<td>' + sparkSvg(x.spark) + '</td></tr>';
-  }).join('');
+      num(x.to20, 1) + num(x.adr, 1) +
+      ['d', 'w1', 'm1', 'm3', 'm6'].map(k => cellStk(x[k], k)).join('') +
+      '<td>' + sparkSvg(x.spark) + '</td></tr>').join('');
 }
 document.querySelectorAll('#scanTbl th[data-sk]').forEach(th => th.onclick = () => {
   const k = th.dataset.sk;
