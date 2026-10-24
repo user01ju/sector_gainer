@@ -9,7 +9,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { flag, brk } from './setup_scan.mjs';
+import { shape } from './setup_scan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DAILY = join(ROOT, 'data', 'daily');
@@ -361,12 +361,12 @@ ${mdRows}
 // ---------- docs/data.js(靜態頁 docs/index.html 以 <script src=data.js> 載入,file:// 也可用) ----------
 writeFileSync(join(ROOT, 'docs', 'data.js'), 'window.REPORT=' + JSON.stringify(report) + ';', 'utf8');
 
-// ---------- docs/scanner.js(Qullamaggie 收縮待突破 / 今日突破,判準在 scripts/setup_scan.mjs) ----------
-// 候選池對齊 capital_stock_api screener.py:三組 C/MinL(126/67/22 根)全市場百分位排名,
-// 任一組 Rank>90% 且當日成交額 > 0.3 億。不用 97% 嚴清單:C/MinL 回檔就掉 rank,做旗形的會先被踢掉。
+// ---------- docs/scanner.js(Qullamaggie 原版動能掃描) ----------
+// 三組 C/MinL(126/67/22 根)全市場百分位排名,任一組 ≥ 95% 且 ADR20 > 4% 就輸出;
+// 量不設門檻。前端預設再濾 Rank ≥ 97 / ADR ≥ 5 / 量 ≥ 1 億。旗形與收縮看圖判斷,形狀指標只顯示不篩。
 const MINL = { '6m': 126, '3m': 67, '1m': 22 };
-const POOL_RANK_MIN = 0.90, POOL_TURNOVER_MIN = 3e7;
-const SETUP_BARS = 70;   // flag/brk 最多回看 64 根
+const RANK_MIN = 0.95, ADR_MIN = 4;
+const SETUP_BARS = 70;   // shape() 最多回看 63 根
 const stockNames = new Map(), stockSectors = new Map();
 for (const cat of categories) for (const st of cat.stocks) {
   stockNames.set(st.id, st.name);
@@ -397,7 +397,7 @@ for (const k of Object.keys(MINL)) {
   }
 }
 // 還原 H/L/C 換算成今日價位(樞紐/停損可直接對盤面)。daily csv 沒有量欄,量用 成交金額/收盤 代理
-// (判準只用量的比值;突破日漲幅大時會比真實量比略低估,約當日均價/收盤的差)
+// (只用量的比值;大漲日會比真實量比略低估,約當日均價/收盤的差)
 function adjBars(s) {
   const k = s.c[s.c.length - 1] / s.cum[s.cum.length - 1];
   const H = [], L = [], C = [], V = [];
@@ -407,17 +407,15 @@ function adjBars(s) {
   }
   return [H, L, C, V];
 }
-let poolN = 0;
 const scanStocks = [];
 for (const { id, s, rank } of universe) {
-  const groups = {};
-  for (const k of Object.keys(MINL)) if (rank[k] > POOL_RANK_MIN) groups[k] = +(rank[k] * 100).toFixed(1);
-  if (!Object.keys(groups).length || !(s.last.turnover > POOL_TURNOVER_MIN)) continue;
-  poolN++;
+  if (!Object.values(rank).some(x => x >= RANK_MIN)) continue;
+  // ADR20:近 20 日平均 (最高/最低 - 1),Qullamaggie 定義
+  const hl = s.h.slice(-20).map((x, j) => x / s.l[s.l.length - Math.min(20, s.l.length) + j] - 1).filter(x => x >= 0 && x < Infinity);   // 缺 high/low 的日子剔除
+  const adr = hl.length >= 10 ? hl.reduce((a, b) => a + b, 0) / hl.length * 100 : null;
+  if (!(adr > ADR_MIN)) continue;
   const bars = adjBars(s);
-  if (bars.flat().some(x => !(x > 0))) continue;   // 缺 high/low 或零價:判準吃不下 NaN,整檔跳過
-  const f = flag(...bars), b = brk(...bars);
-  if (!f && !b) continue;
+  const sh = bars.flat().some(x => !(x > 0)) ? null : shape(...bars);   // 缺 high/low 或零價就不算形狀
   const m = stockMetrics(id);
   let base = null;
   const spark = sparkSamples.map(idx => {
@@ -427,15 +425,17 @@ for (const { id, s, rank } of universe) {
     return +((c / base - 1) * 100).toFixed(1);
   });
   scanStocks.push({
-    id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'), close: m.close, groups,
+    id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'), close: m.close,
+    rank: Object.fromEntries(Object.keys(MINL).map(k => [k, rank[k] == null ? null : +(rank[k] * 100).toFixed(1)])),
+    adr: +adr.toFixed(2),
     to20: +(s.to.slice(-20).reduce((a, x) => a + x, 0) / Math.min(20, s.to.length) / 1e8).toFixed(2),   // 量縮日當日額偏低,用 20 日均
-    flag: f, brk: b,
+    shape: sh,
     ...Object.fromEntries(METRICS.map(k => [k, m[k] == null ? null : +m[k].toFixed(2)])),
     spark,
   });
 }
 writeFileSync(join(ROOT, 'docs', 'scanner.js'),
-  'window.SCANNER=' + JSON.stringify({ date: latestDate, universe: universe.length, pool: poolN, stocks: scanStocks }) + ';', 'utf8');
+  'window.SCANNER=' + JSON.stringify({ date: latestDate, universe: universe.length, stocks: scanStocks }) + ';', 'utf8');
 
 // ---------- docs/themes.js(MoneyDJ 細產業:題材標籤 + 題材熱度榜) ----------
 // MoneyDJ 一檔平均屬 3.5 個細產業(鴻海 32 個),多重歸屬不能用成交金額加權 —— 同一檔會同時
@@ -472,4 +472,4 @@ if (existsSync(join(ROOT, 'data', 'moneydj.json'))) {
   console.error(`themes: ${themes.length} 個 MoneyDJ 細產業有成分股(來源 ${mdj.subs.length} 個,分類更新於 ${mdj.updated})`);
 }
 
-console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} setups (pool ${poolN}) -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);
+console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} scan stocks -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);
