@@ -189,35 +189,28 @@
 <div class="view" id="v-scan" style="display:none;">
   <div class="crumb">
     <label class="filt mode">模式 <select id="scanMode">
-      <option value="flag">收縮中(watchlist)</option>
+      <option value="flag">收縮待突破</option>
       <option value="brk">今日突破</option>
-      <option value="momo">全部動能股</option>
     </select></label>
-    <label class="filt">動能腿 <select id="scMomoK">
-      <option value="m1">1m</option><option value="m3" selected>3m</option><option value="m6">6m</option>
-    </select> ≥ <input type="number" id="scMomo" value="50" style="width:50px">%</label>
-    <label class="filt" id="lblW1"><span id="w1tag">1w</span> <input type="number" id="scW1lo" value="-12" style="width:48px"> ~ <input type="number" id="scW1hi" value="5" style="width:44px">%</label>
-    <label class="filt" id="lblD">|當日| ≤ <input type="number" id="scD" value="5" style="width:42px">%</label>
-    <label class="filt" id="lblBrk" style="display:none;">突破日 ≥ <input type="number" id="scBrk" value="4" style="width:42px">%</label>
-    <label class="filt">量 ≥ <input type="number" id="scVol" value="3" style="width:46px">億/日</label>
-    <label class="filt">ADR ≥ <input type="number" id="scAdr" value="4" step="0.5" style="width:48px">%</label>
-    <label class="filt">距高 ≤ <input type="number" id="scOff" value="30" style="width:46px">%</label>
-    <label class="filt">量縮 ≤ <input type="number" id="scVq" step="0.1" placeholder="不限" style="width:50px"></label>
+    <label class="filt">20日均量 ≥ <input type="number" id="scVol" value="1" step="0.5" style="width:46px">億</label>
+    <label class="filt">ADR ≥ <input type="number" id="scAdr" value="5" step="0.5" style="width:48px">%</label>
     <span class="sub" id="scanCount" style="font-weight:600;"></span>
   </div>
   <div class="tbl-wrap">
   <table id="scanTbl">
     <thead><tr>
-      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="tag">題材</th><th data-sk="close">收盤</th>
-      <th data-sk="turnover">量(億)</th><th data-sk="adr">ADR%</th><th data-sk="off">距高%</th><th data-sk="tight">10日幅%</th><th data-sk="vq">量縮</th><th data-sk="p10">距10高%</th><th data-sk="lh">腿高%</th>
-      <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th>
-      <th data-sk="m3">3m%</th><th data-sk="m6">6m%</th><th data-sk="m12">12m%</th>
+      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="tag">題材</th><th data-sk="grp">動能組</th><th data-sk="close">收盤</th>
+      <th data-sk="to20">量20(億)</th><th data-sk="adr">ADR%</th><th data-sk="offHigh">距腿高%</th><th data-sk="daysOff">休(根)</th>
+      <th data-sk="tight">收縮</th><th data-sk="vq">量縮</th><th data-sk="rc">rc</th><th data-sk="pivot">樞紐</th><th data-sk="distAdr">距樞紐</th>
+      <th data-sk="stop">停損</th><th data-sk="riskPct">風險%</th><th data-sk="score">分數</th>
+      <th data-sk="chgPct" class="brkcol">漲%</th><th data-sk="volx" class="brkcol">量倍</th>
+      <th data-sk="m1">1m%</th><th data-sk="m3">3m%</th><th data-sk="m6">6m%</th>
       <th class="nosort">1y 走勢</th>
     </tr></thead>
     <tbody></tbody>
   </table>
   </div>
-  <div class="legend">收縮中 = 動能腿後短線整理(Q 式旗形候選);動能腿門檻比的是<b>腿高%</b>(所選尺度窗口內的還原高點 vs 基準日),不是現價報酬,所以深回檔不會把設定成形中的股票踢出名單;今日突破 = 昨日仍在收縮帶、今日大漲;ADR20 為收盤高低價計算。族群篩選不適用本頁,搜尋適用。</div>
+  <div class="legend">判準與 capital_stock_api 的 setup_scan 同一套(固定,不給拉桿):候選池 = 6m/3m/1m 任一組 C/MinL 全市場 Rank&gt;90%,池內再過收縮或突破條件,欄位定義見下方名詞解釋。量、ADR 只是額外濾網,不影響判定。族群篩選不適用本頁,搜尋適用。</div>
 </div>
 
 <div class="view" id="v-trend" style="display:none;">
@@ -254,20 +247,22 @@
 
     <h4>突破掃描</h4>
     <table class="gloss-tbl">
-      <thead><tr><th>欄位</th><th>定義</th><th>好的數值</th></tr></thead>
+      <thead><tr><th>欄位</th><th>定義</th><th>門檻 / 好的數值</th></tr></thead>
       <tbody>
-        <tr><td>動能腿 / 腿高%</td><td>所選尺度(1m/3m/6m)窗口內的<b>還原高點</b> / 基準日還原值 − 1。量「這條腿最高漲到多少」,不是「到今天還剩多少」——腿漲完後回檔多深都不會被踢出名單,那正是旗形成形的時候。</td><td>3m ≥ 50%</td></tr>
-        <tr><td>量(億)</td><td>當日成交金額。流動性是硬條件,小量股再強也不能碰。</td><td>≥ 3 億,部位大就提高</td></tr>
-        <tr><td>ADR%</td><td>近 20 日平均 <code>(最高/最低 − 1)</code>,Q 的定義。波動性 = 利潤潛力。</td><td>≥ 4(嚴格 5+)</td></tr>
-        <tr><td>距高%</td><td><code>今天 / 52 週還原高 − 1</code>。頭頂還有多少套牢賣壓。「回檔太深已經不能碰」由這條管,不是動能門檻的事。</td><td>&gt; −15%</td></tr>
-        <tr><td>10日幅%</td><td>近 10 日還原高 / 低 − 1。整理帶的緊度,越小代表收縮越乾淨。</td><td>&lt; 10%</td></tr>
-        <tr><td>量縮</td><td>近 5 日均量 / 近 20 日均量。整理期該量枯。</td><td>&lt; 0.6 佳,&gt; 1.2 可疑</td></tr>
-        <tr><td>距10高%</td><td><code>今天 / 近 10 日還原高 − 1</code>,窗口含今天所以恆 ≤ 0。樞紐價距離的代理(真正的整理區高點要看圖才畫得出來),答的是「明天誰最可能觸發」——排序器,不是篩選器。</td><td>&gt; −3% 一觸即發</td></tr>
-        <tr><td>1w%</td><td>旗形中的位置。太深 = 還在跌,太淺 = 還沒回。</td><td>−8% ~ +3%,近 0 最佳</td></tr>
-        <tr><td>12m% + 1y 走勢</td><td>故事的長度。第一段腿後的第一、二面旗最會漲;漲了一年的第五面旗少碰。</td><td>樓梯型健康,拋物線=末段,鋸齒=籌碼亂</td></tr>
+        <tr><td>動能組</td><td>候選池:6m / 3m / 1m 的 <code>還原收盤 / 近 126/67/22 根還原最低價</code>(Q 的 C/MinL)全市場百分位排名,列出 Rank &gt; 90% 的組別(滑過看 Rank)。動能腿由這關負責,下面只判收縮。</td><td>任一組 &gt; 90%,當日成交額 &gt; 0.3 億</td></tr>
+        <tr><td>量20(億)</td><td>近 20 日平均成交金額。量縮整理期當日額會偏低,所以不用當日。</td><td>預設濾網 ≥ 1 億</td></tr>
+        <tr><td>ADR%</td><td>近 20 日平均 <code>(最高/最低 − 1)</code>,Q 的定義。波動性 = 利潤潛力。</td><td>預設濾網 ≥ 5</td></tr>
+        <tr><td>距腿高% / 休</td><td>今天距近 63 根還原高點的跌幅,以及高點後過了幾根。回太深不算旗形;休太短是還在噴、太長是長底不是旗形。</td><td>≥ −25%;3 ~ 40 根</td></tr>
+        <tr><td>收縮</td><td>近 5 日平均振幅 / ADR60。用 60 日當分母,收縮才不會自己拉低基準。</td><td>≤ 0.85</td></tr>
+        <tr><td>量縮</td><td>近 5 日均量 / 近 50 日均量。量用 成交金額 ÷ 收盤 代理。</td><td>≤ 0.9</td></tr>
+        <tr><td>rc</td><td>近 5 日高低區間 / 前 5 日區間,&lt; 1 = 越收越窄(VCP)。只計分不當門檻。</td><td>越小越好</td></tr>
+        <tr><td>樞紐 / 距樞紐</td><td>樞紐 = 近 10 日還原高(已換算成今日價位,可直接對盤面);距樞紐 = 收盤到樞紐的距離 ÷ ADR。另要求收盤站上 MA20 且 MA20 上彎、當日漲跌 ≤ 0.8 ADR。</td><td>≤ 2 ADR</td></tr>
+        <tr><td>停損 / 風險%</td><td>收縮待突破:近 5 日最低(上限參考,實際用進場日低);今日突破:今日低(LOD)。風險% = 進場價到停損的距離。</td><td>越小部位可越大</td></tr>
+        <tr><td>分數</td><td><code>收縮 + 量縮 + 距樞紐/2 + min(rc, 2)</code>,收縮待突破的預設排序。</td><td>越低越好</td></tr>
+        <tr><td>漲% / 量倍</td><td>今日突破專用:今日漲幅、今日量 / 前 50 日均量。</td><td>收盤 &gt; 昨日樞紐,量倍 ≥ 1.5</td></tr>
       </tbody>
     </table>
-    <div class="gloss-note">三種模式共用上面這組底層條件,差別只在專屬條件:<b>收縮中</b> = 動能腿後短線整理(1w 在帶內 + 當日小幅),旗形候選;<b>今日突破</b> = 昨日仍在收縮帶、今日大漲;<b>全部動能股</b> = 只過底層條件。族群下拉不作用於本頁,搜尋可用。</div>
+    <div class="gloss-note"><b>收縮待突破</b> = 池內通過上面所有收縮條件;<b>今日突破</b> = 昨天還是收縮待突破、今天收盤越過昨天的樞紐且量倍 ≥ 1.5。判準與 capital_stock_api 的 setup_scan 同一套(固定參數),量、ADR 兩個輸入框只是額外濾網。回測結論:收縮過濾沒有增加 edge,它的價值是把每天上百檔的動能池縮到個位數,最後仍要看圖。族群下拉不作用於本頁,搜尋可用。</div>
 
     <h4>題材榜（MoneyDJ 細產業）</h4>
     <dl>
@@ -672,14 +667,16 @@ document.getElementById('thMinN').oninput = renderTheme;
 document.getElementById('thMinT').oninput = renderTheme;
 document.getElementById('thGrp').onchange = renderTheme;
 
-// ---------- 突破掃描 ----------
+// ---------- 突破掃描(判準在 build_report 算好,前端只做量/ADR 濾網與排序) ----------
 const SC = (window.SCANNER || {}).stocks || [];
 for (const x of SC) {
   const tg = TAGS.get(x.id) || [];
   x.tag = tg.join('・');
   x.tagShort = tg.slice(0, 2).join('・') + (tg.length > 2 ? ' +' + (tg.length - 2) : '');
+  x.grp = Object.keys(x.groups).length;
 }
-let scanSortKey = 'm3', scanSortDir = -1;
+const SCAN_SORT = { flag: ['score', 1], brk: ['volx', -1] };   // 同 capital setup.json 的排序
+let scanSortKey = 'score', scanSortDir = 1, scanModeShown = 'flag';
 const scanVal = id => +document.getElementById(id).value;
 function updateScanMarks() {
   document.querySelectorAll('#scanTbl th[data-sk]').forEach(th => {
@@ -688,55 +685,40 @@ function updateScanMarks() {
   });
 }
 function renderScan() {
-  updateScanMarks();
   const mode = document.getElementById('scanMode').value;
-  document.getElementById('lblD').style.display = mode === 'flag' ? '' : 'none';
-  document.getElementById('lblBrk').style.display = mode === 'brk' ? '' : 'none';
-  document.getElementById('lblW1').style.display = mode === 'momo' ? 'none' : '';
-  document.getElementById('w1tag').textContent = mode === 'brk' ? '前5日(不含今日)' : '1w';
+  if (mode !== scanModeShown) { [scanSortKey, scanSortDir] = SCAN_SORT[mode]; scanModeShown = mode; }
+  updateScanMarks();
+  document.querySelectorAll('#scanTbl .brkcol').forEach(th => th.style.display = mode === 'brk' ? '' : 'none');
   const q = document.getElementById('search').value.trim().toLowerCase();
-  const MK = document.getElementById('scMomoK').value, MV = scanVal('scMomo'), W1lo = scanVal('scW1lo'), W1hi = scanVal('scW1hi');
-  const LHK = 'lh' + MK.slice(1); // 動能腿判準 = 腿高(窗口內還原高點 vs 基準日),不受事後回檔侵蝕
-  const Dmax = scanVal('scD'), BRK = scanVal('scBrk'), VOL = scanVal('scVol') * 1e8, ADR = scanVal('scAdr'), OFF = scanVal('scOff');
-  let rows = SC.filter(x => {
+  const VOL = scanVal('scVol'), ADR = scanVal('scAdr');
+  const val = (x, k) => k in x[mode] ? x[mode][k] : x[k];
+  const rows = SC.filter(x => {
+    if (!x[mode]) return false;
     if (q && !(x.id.includes(q) || x.name.toLowerCase().includes(q) || x.sec.toLowerCase().includes(q))) return false;
-    if (x[LHK] == null || x[LHK] < MV) return false;
-    if (x.turnover < VOL) return false;
-    if (ADR > 0 && (x.adr == null || x.adr < ADR)) return false;
-    if (x.off == null || x.off < -OFF) return false;
-    const VQ = parseFloat(document.getElementById('scVq').value);
-    if (!isNaN(VQ) && (x.vq == null || x.vq > VQ)) return false;
-    if (mode === 'flag') {
-      if (x.w1 == null || x.w1 < W1lo || x.w1 > W1hi) return false;
-      if (x.d == null || Math.abs(x.d) > Dmax) return false;
-    } else if (mode === 'brk') {
-      if (x.d == null || x.d < BRK) return false;
-      const w1ex = x.w1 == null ? null : ((1 + x.w1 / 100) / (1 + x.d / 100) - 1) * 100;
-      if (w1ex == null || w1ex < W1lo || w1ex > W1hi) return false;
-    }
-    return true;
+    return x.to20 >= VOL && x[mode].adr >= ADR;
   });
-  const sortKey = scanSortKey === 'lh' ? LHK : scanSortKey;
   rows.sort((a, b) => {
-    const va = a[sortKey], vb = b[sortKey];
+    const va = val(a, scanSortKey), vb = val(b, scanSortKey);
     if (typeof va === 'string') return va.localeCompare(vb, 'zh-TW') * -scanSortDir;
     return ((va ?? -9999) - (vb ?? -9999)) * scanSortDir;
   });
-  document.getElementById('scanCount').textContent = rows.length + ' 檔' + (rows.length > 200 ? '(顯示前 200)' : '');
-  document.querySelector('#scanTbl tbody').innerHTML = rows.slice(0, 200).map(x =>
-    '<tr><td>' + x.id + ' ' + x.name + '</td>' +
-    '<td>' + x.sec + '</td>' +
-    '<td class="tagcell"' + (x.tag ? ' title="' + x.tag + '"' : '') + '>' + (x.tagShort || '') + '</td>' +
-    '<td class="num">' + x.close + '</td>' +
-    '<td class="num">' + (x.turnover / 1e8).toFixed(1) + '</td>' +
-    '<td class="num">' + (x.adr == null ? '--' : x.adr.toFixed(1)) + '</td>' +
-    '<td class="num">' + (x.off == null ? '--' : x.off.toFixed(1)) + '</td>' +
-    '<td class="num">' + (x.tight == null ? '--' : x.tight.toFixed(1)) + '</td>' +
-    '<td class="num">' + (x.vq == null ? '--' : x.vq.toFixed(2)) + '</td>' +
-    '<td class="num">' + (x.p10 == null ? '--' : x.p10.toFixed(1)) + '</td>' +
-    '<td class="num">' + (x[LHK] == null ? '--' : x[LHK].toFixed(1)) + '</td>' +
-    METRICS.map(k => cellStk(x[k], k)).join('') +
-    '<td>' + sparkSvg(x.spark) + '</td></tr>').join('');
+  const S = window.SCANNER || {};
+  document.getElementById('scanCount').textContent = rows.length + ' 檔(池 ' + (S.pool ?? '--') + ' / ' + (S.universe ?? '--') + ')';
+  const num = (v, d) => '<td class="num">' + (v == null ? '--' : v.toFixed(d)) + '</td>';
+  document.querySelector('#scanTbl tbody').innerHTML = rows.map(x => {
+    const f = x[mode];
+    return '<tr><td>' + x.id + ' ' + x.name + '</td>' +
+      '<td>' + x.sec + '</td>' +
+      '<td class="tagcell"' + (x.tag ? ' title="' + x.tag + '"' : '') + '>' + (x.tagShort || '') + '</td>' +
+      '<td class="num" title="' + Object.entries(x.groups).map(([k, r]) => k + ' Rank ' + r + '%').join('&#10;') + '">' + Object.keys(x.groups).join(' ') + '</td>' +
+      '<td class="num">' + x.close + '</td>' +
+      num(x.to20, 1) + num(f.adr, 1) + num(f.offHigh, 1) + '<td class="num">' + f.daysOff + '</td>' +
+      num(f.tight, 2) + num(f.vq, 2) + num(f.rc, 2) + num(f.pivot, 2) + num(f.distAdr, 2) +
+      num(f.stop, 2) + num(f.riskPct, 1) + num(f.score, 2) +
+      (mode === 'brk' ? num(f.chgPct, 1) + num(f.volx, 2) : '') +
+      ['m1', 'm3', 'm6'].map(k => cellStk(x[k], k)).join('') +
+      '<td>' + sparkSvg(x.spark) + '</td></tr>';
+  }).join('');
 }
 document.querySelectorAll('#scanTbl th[data-sk]').forEach(th => th.onclick = () => {
   const k = th.dataset.sk;
@@ -744,12 +726,6 @@ document.querySelectorAll('#scanTbl th[data-sk]').forEach(th => th.onclick = () 
   renderScan();
 });
 document.querySelectorAll('#v-scan select, #v-scan input').forEach(el => el.onchange = renderScan);
-// 切換動能尺度時自動帶入該尺度的常用門檻
-const MOMO_DEF = { m1: 30, m3: 50, m6: 100 };
-document.getElementById('scMomoK').onchange = () => {
-  document.getElementById('scMomo').value = MOMO_DEF[document.getElementById('scMomoK').value];
-  renderScan();
-};
 
 // ---------- 大盤燈號 ----------
 const DOT = { green: '🟢', yellow: '🟡', red: '🔴' };

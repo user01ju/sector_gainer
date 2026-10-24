@@ -9,6 +9,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { flag, brk } from './setup_scan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DAILY = join(ROOT, 'data', 'daily');
@@ -119,8 +120,8 @@ rawDays.forEach((day, i) => {
   if (dropped[i]) return;
   for (const [id, { close, change, turnover, high, low }] of day) {
     let s = series.get(id);
-    if (!s) { s = { pos: [], cum: [], hl: [], to: [], pc: null, lastIdx: null }; series.set(id, s); }
-    s.hl.push(high != null && low != null && low > 0 ? high / low - 1 : null);
+    if (!s) { s = { pos: [], cum: [], h: [], l: [], c: [], to: [], pc: null, lastIdx: null }; series.set(id, s); }
+    s.h.push(high); s.l.push(low); s.c.push(close);
     s.to.push(turnover);
     const exref = exrights.get(`${dates[i]}|${id}`);
     const base = exref ?? s.pc;
@@ -360,85 +361,81 @@ ${mdRows}
 // ---------- docs/data.js(靜態頁 docs/index.html 以 <script src=data.js> 載入,file:// 也可用) ----------
 writeFileSync(join(ROOT, 'docs', 'data.js'), 'window.REPORT=' + JSON.stringify(report) + ';', 'utf8');
 
-// ---------- docs/scanner.js(Qullamaggie 式掃描指標,個股層級) ----------
+// ---------- docs/scanner.js(Qullamaggie 收縮待突破 / 今日突破,判準在 scripts/setup_scan.mjs) ----------
+// 候選池對齊 capital_stock_api screener.py:三組 C/MinL(126/67/22 根)全市場百分位排名,
+// 任一組 Rank>90% 且當日成交額 > 0.3 億。不用 97% 嚴清單:C/MinL 回檔就掉 rank,做旗形的會先被踢掉。
+const MINL = { '6m': 126, '3m': 67, '1m': 22 };
+const POOL_RANK_MIN = 0.90, POOL_TURNOVER_MIN = 3e7;
+const SETUP_BARS = 70;   // flag/brk 最多回看 64 根
 const stockNames = new Map(), stockSectors = new Map();
 for (const cat of categories) for (const st of cat.stocks) {
   stockNames.set(st.id, st.name);
   if (!stockSectors.has(st.id)) stockSectors.set(st.id, []);
   stockSectors.get(st.id).push(cat.name);
 }
-const start12 = baseIdx.m12 >= 0 ? baseIdx.m12 : 0;
-const scanStocks = [];
+const universe = [];
 for (const [id, s] of series) {
-  if (!s.last || !stockSectors.has(id)) continue;
-  const m = stockMetrics(id);
-  if (!m) continue;
+  if (!s.last || !stockSectors.has(id) || s.c.length < MINL['1m'] + 1) continue;
   const cumT = s.cum[s.cum.length - 1];
-  // ADR20:近 20 日平均 (最高/最低 - 1),Qullamaggie 定義
-  const hl = s.hl.filter(v => v != null).slice(-20);
-  const adr = hl.length >= 10 ? +(hl.reduce((a, b) => a + b, 0) / hl.length * 100).toFixed(2) : null;
-  // 距 52 週(資料窗口)還原高點
-  let maxCum = 0;
-  for (let j = s.pos.length - 1; j >= 0 && s.pos[j] >= start12; j--) if (s.cum[j] > maxCum) maxCum = s.cum[j];
-  const off = maxCum > 0 ? +((cumT / maxCum - 1) * 100).toFixed(1) : null;
-  // 動能腿高:窗口內還原高點 / 基準日還原值 − 1。量「這條腿曾經多強」,不會被事後回檔侵蝕
-  const legHigh = {};
-  for (const k of ['m1', 'm3', 'm6']) {
-    const bi = baseIdx[k];
-    const base = bi >= 0 ? cumAt(id, bi) : null;
-    let hi = 0;
-    if (base != null) for (let j = s.pos.length - 1; j >= 0 && s.pos[j] >= bi; j--) if (s.cum[j] > hi) hi = s.cum[j];
-    legHigh['lh' + k.slice(1)] = base > 0 && hi > 0 ? +((hi / base - 1) * 100).toFixed(2) : null;
+  const minL = {};
+  for (const [k, n] of Object.entries(MINL)) {
+    let mn = Infinity;
+    for (let j = Math.max(0, s.c.length - n); j < s.c.length; j++)
+      if (s.l[j] > 0 && s.c[j] > 0) mn = Math.min(mn, s.l[j] * s.cum[j] / s.c[j]);
+    minL[k] = mn < Infinity ? cumT / mn : null;
   }
-  // 還原序列對 MA 的距離
-  const maDist = n => {
-    if (s.cum.length < n) return null;
-    let sum = 0;
-    for (let j = s.cum.length - n; j < s.cum.length; j++) sum += s.cum[j];
-    return +((cumT / (sum / n) - 1) * 100).toFixed(1);
-  };
-  // 10 日收縮度:近 10 日還原高低區間 %
-  let tight = null;
-  if (s.cum.length >= 10) {
-    const w = s.cum.slice(-10);
-    tight = +((Math.max(...w) / Math.min(...w) - 1) * 100).toFixed(1);
+  universe.push({ id, s, minL, rank: {} });
+}
+// 百分位排名同 pandas rank(pct=True):並列取平均名次 / 有效檔數
+for (const k of Object.keys(MINL)) {
+  const xs = universe.filter(u => u.minL[k] != null).sort((a, b) => a.minL[k] - b.minL[k]);
+  for (let i = 0; i < xs.length;) {
+    let j = i;
+    while (j + 1 < xs.length && xs[j + 1].minL[k] === xs[i].minL[k]) j++;
+    for (let q = i; q <= j; q++) xs[q].rank[k] = (i + j + 2) / 2 / xs.length;
+    i = j + 1;
   }
-  // 量縮比:近 5 日均量 / 近 20 日均量(< 1 = 整理期量縮)
-  let vq = null;
-  if (s.to.length >= 20) {
-    const last20 = s.to.slice(-20);
-    const m20 = last20.reduce((a, b) => a + b, 0) / 20;
-    const m5 = last20.slice(-5).reduce((a, b) => a + b, 0) / 5;
-    vq = m20 > 0 ? +(m5 / m20).toFixed(2) : null;
+}
+// 還原 H/L/C 換算成今日價位(樞紐/停損可直接對盤面)。daily csv 沒有量欄,量用 成交金額/收盤 代理
+// (判準只用量的比值;突破日漲幅大時會比真實量比略低估,約當日均價/收盤的差)
+function adjBars(s) {
+  const k = s.c[s.c.length - 1] / s.cum[s.cum.length - 1];
+  const H = [], L = [], C = [], V = [];
+  for (let j = Math.max(0, s.c.length - SETUP_BARS); j < s.c.length; j++) {
+    const f = s.cum[j] / s.c[j] * k;
+    H.push(s.h[j] * f); L.push(s.l[j] * f); C.push(s.cum[j] * k); V.push(s.to[j] / s.c[j]);
   }
-  // 距近 10 日還原高(樞紐價距離代理,0 = 一觸即發)
-  let p10 = null;
-  if (s.cum.length >= 2) {
-    const w = s.cum.slice(-10);
-    p10 = +((cumT / Math.max(...w) - 1) * 100).toFixed(1);
-  }
-  // 動能預篩通過者才帶 sparkline,控制檔案大小
-  let spark = [];
-  if ((legHigh.lh1 != null && legHigh.lh1 >= 15) || (legHigh.lh3 != null && legHigh.lh3 >= 30)) {
-    let base = null;
-    spark = sparkSamples.map(idx => {
-      const c = cumAt(id, idx);
-      if (c == null) return null;
-      if (base == null) base = c;
-      return +((c / base - 1) * 100).toFixed(1);
-    });
-  }
+  return [H, L, C, V];
+}
+let poolN = 0;
+const scanStocks = [];
+for (const { id, s, rank } of universe) {
+  const groups = {};
+  for (const k of Object.keys(MINL)) if (rank[k] > POOL_RANK_MIN) groups[k] = +(rank[k] * 100).toFixed(1);
+  if (!Object.keys(groups).length || !(s.last.turnover > POOL_TURNOVER_MIN)) continue;
+  poolN++;
+  const bars = adjBars(s);
+  if (bars.flat().some(x => !(x > 0))) continue;   // 缺 high/low 或零價:判準吃不下 NaN,整檔跳過
+  const f = flag(...bars), b = brk(...bars);
+  if (!f && !b) continue;
+  const m = stockMetrics(id);
+  let base = null;
+  const spark = sparkSamples.map(idx => {
+    const c = cumAt(id, idx);
+    if (c == null) return null;
+    if (base == null) base = c;
+    return +((c / base - 1) * 100).toFixed(1);
+  });
   scanStocks.push({
-    id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'),
-    close: m.close, turnover: m.turnover,
-    adr, off, ma10: maDist(10), ma20: maDist(20), ma50: maDist(50), tight, vq, p10,
-    ...legHigh,
+    id, name: stockNames.get(id), sec: stockSectors.get(id).slice(0, 2).join('・'), close: m.close, groups,
+    to20: +(s.to.slice(-20).reduce((a, x) => a + x, 0) / Math.min(20, s.to.length) / 1e8).toFixed(2),   // 量縮日當日額偏低,用 20 日均
+    flag: f, brk: b,
     ...Object.fromEntries(METRICS.map(k => [k, m[k] == null ? null : +m[k].toFixed(2)])),
     spark,
   });
 }
 writeFileSync(join(ROOT, 'docs', 'scanner.js'),
-  'window.SCANNER=' + JSON.stringify({ date: latestDate, stocks: scanStocks }) + ';', 'utf8');
+  'window.SCANNER=' + JSON.stringify({ date: latestDate, universe: universe.length, pool: poolN, stocks: scanStocks }) + ';', 'utf8');
 
 // ---------- docs/themes.js(MoneyDJ 細產業:題材標籤 + 題材熱度榜) ----------
 // MoneyDJ 一檔平均屬 3.5 個細產業(鴻海 32 個),多重歸屬不能用成交金額加權 —— 同一檔會同時
@@ -475,4 +472,4 @@ if (existsSync(join(ROOT, 'data', 'moneydj.json'))) {
   console.error(`themes: ${themes.length} 個 MoneyDJ 細產業有成分股(來源 ${mdj.subs.length} 個,分類更新於 ${mdj.updated})`);
 }
 
-console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} scan stocks -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);
+console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} setups (pool ${poolN}) -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);
