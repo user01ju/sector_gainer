@@ -207,7 +207,7 @@
   <div class="tbl-wrap">
   <table id="scanTbl">
     <thead><tr>
-      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="tag">題材</th><th data-sk="rk">動能組</th><th data-sk="close">收盤</th>
+      <th data-sk="id">代碼 名稱</th><th data-sk="sec">族群</th><th data-sk="tag">題材</th><th data-sk="rk">Rank / 達標組</th><th data-sk="close">收盤</th>
       <th data-sk="to20">量20(億)</th><th data-sk="adr">ADR%</th>
       <th data-sk="d">當日%</th><th data-sk="w1">1w%</th><th data-sk="m1">1m%</th><th data-sk="m3">3m%</th><th data-sk="m6">6m%</th>
       <th class="nosort">1y 走勢</th>
@@ -255,7 +255,7 @@
     <table class="gloss-tbl">
       <thead><tr><th>欄位</th><th>定義</th><th>門檻 / 好的數值</th></tr></thead>
       <tbody>
-        <tr><td>動能組</td><td>6m / 3m / 1m 的 <code>還原收盤 / 近 126/67/22 根還原最低價</code>(Q 的 C/MinL)全市場百分位排名。下拉選組、Rank 濾網套在所選組;欄內列出達到濾網值的組別(滑過看三組 Rank)。</td><td>預設 ≥ 97(Q 原話前 1~2%)</td></tr>
+        <tr><td>Rank / 達標組</td><td>6m / 3m / 1m 的 <code>還原收盤 / 近 126/67/22 根還原最低價</code>(Q 的 C/MinL)全市場百分位排名。下拉選組、Rank 濾網套在所選組;欄內數字 = 所選組 Rank(排序依據),旁邊小字列出達到濾網值的組別(滑過看三組 Rank)。</td><td>預設 ≥ 97(Q 原話前 1~2%)</td></tr>
         <tr><td>量20(億)</td><td>近 20 日平均成交金額。量縮整理期當日額會偏低,所以不用當日。</td><td>預設濾網 ≥ 1 億</td></tr>
         <tr><td>ADR%</td><td>近 20 日平均 <code>(最高/最低 − 1)</code>,Q 的定義。波動性 = 利潤潛力。</td><td>資料門檻 &gt; 4,預設濾網 ≥ 5</td></tr>
       </tbody>
@@ -744,7 +744,7 @@ function renderScan() {
       '<td>' + x.sec + (x.secObj ? SEC_ROT.badge(x.secObj) : '') + '</td>' +
       tagCell(x) +
       '<td class="num" title="' + Object.entries(x.rank).map(([k, r]) => k + ' Rank ' + (r ?? '--') + '%').join('&#10;') + '">' +
-        Object.keys(x.rank).filter(k => x.rank[k] >= RK).join(' ') + '</td>' +
+        (x.rank[MK] ?? '--') + ' <span class="sub">' + Object.keys(x.rank).filter(k => x.rank[k] >= RK).join(' ') + '</span></td>' +
       '<td class="num">' + x.close + '</td>' +
       num(x.to20, 1) + num(x.adr, 1) +
       ['d', 'w1', 'm1', 'm3', 'm6'].map(k => cellStk(x[k], k)).join('') +
