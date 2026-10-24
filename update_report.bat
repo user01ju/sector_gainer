@@ -28,7 +28,7 @@ echo Done. Opening report...
 start "" "%~dp0docs\index.html"
 
 echo === [5/5] Commit and push ===
-git add -A
+git add data docs README.md
 git diff --cached --quiet
 if not errorlevel 1 (
   echo No changes to commit.
