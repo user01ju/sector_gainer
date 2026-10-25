@@ -76,6 +76,22 @@
   .crumb button { padding:4px 10px; border:1px solid var(--border); border-radius:4px; background:var(--panel-alt); color:var(--text); cursor:pointer; font-size:12px; }
   #scBox { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px; }
   .legend { font-size:12px; color:var(--text2); margin-top:8px; line-height:1.6; }
+  .sc-grid { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:10px; }
+  @media (max-width:900px) { .sc-grid { grid-template-columns:minmax(0,1fr); } }
+  #scSide, #scDetail { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:12px; min-width:0; }
+  #scDetail { margin-top:10px; }
+  #scSide h5 { margin:10px 0 3px; font-size:12px; display:flex; justify-content:space-between; gap:6px; }
+  #scSide h5:first-child { margin-top:0; }
+  #scSide h5 span, .sc-li .q { color:var(--text2); font-size:11px; font-weight:400; white-space:nowrap; }
+  .sc-li { display:grid; grid-template-columns:minmax(0,1fr) auto 44px; gap:6px; padding:2px 4px; border-radius:3px; cursor:pointer; }
+  .sc-li:hover, .sc-li.on { background:var(--hover); }
+  .sc-li.on { box-shadow:inset 2px 0 0 var(--accent); }
+  .sc-li .n { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sc-li .v { text-align:right; font-variant-numeric:tabular-nums; }
+  .sc-drow { display:grid; grid-template-columns:120px minmax(0,1fr) minmax(0,1fr); gap:10px; align-items:center; padding:4px 0; border-top:1px solid var(--border); }
+  .sc-drow:first-of-type { border-top:0; }
+  .sc-drow svg { width:100%; height:44px; display:block; }
+  @media (max-width:600px) { .sc-drow { grid-template-columns:minmax(0,1fr); } }
   .tagcell { color:var(--text2); font-size:11.5px; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
   .gloss { margin:0 16px 40px; border-top:1px solid var(--border); padding-top:10px; }
   .gloss > summary { cursor:pointer; color:var(--text2); font-size:12.5px; padding:4px 0; user-select:none; list-style:none; }
@@ -155,20 +171,27 @@
 
 <div class="view" id="v-scatter" style="display:none;">
   <div class="crumb">
-    <label class="sub">X:<select id="scX">
-      <option value="d">當日%</option><option value="w1">1w%</option><option value="m1" selected>1m%</option>
-      <option value="m3">3m%</option><option value="m6">6m%</option><option value="m12">12m%</option>
+    <label class="sub">座標:<select id="scMode">
+      <option value="rrg" selected>RRG 相對大盤</option><option value="w1">3m × 1w</option><option value="m1">3m × 1m</option>
     </select></label>
-    <label class="sub">Y:<select id="scY">
-      <option value="d">當日%</option><option value="w1" selected>1w%</option><option value="m1">1m%</option>
-      <option value="m3">3m%</option><option value="m6">6m%</option><option value="m12">12m%</option>
-    </select></label>
+    <label class="sub">步長:<select id="scStep"><option value="5" selected>週</option><option value="1">日</option></select></label>
+    <label class="sub">尾長 <input type="range" id="scTail" min="0" max="20" step="1" value="6" style="width:90px;vertical-align:middle;"><b id="scTailv" style="display:inline-block;min-width:36px;"></b></label>
     <label class="sub">量 ≥ <input type="range" id="scMinT" min="0" max="15" step="1" value="7" style="width:120px;vertical-align:middle;"><b id="scMinTv" style="display:inline-block;min-width:52px;"></b></label>
+    <label class="sub">尾巴:<select id="scTails"><option value="top" selected>量前 12 + 選取</option><option value="all">全部</option><option value="sel">只畫選取</option></select></label>
     <span class="sub" id="scCount" style="font-weight:600;"></span>
-    <span style="flex:1"></span>
-    <span class="sub">泡泡大小 = 成交金額,顏色 = 當日漲跌;右上 = 雙強、左上 = 短強長弱(補漲)、右下 = 短弱長強(回檔)</span>
   </div>
-  <div id="scBox"></div>
+  <div class="crumb">
+    <button id="scPlay">▶ 播放</button>
+    <input type="range" id="scEnd" style="flex:1;min-width:160px;">
+    <b class="sub" id="scEndv"></b>
+    <button id="scClear">清除選取</button>
+  </div>
+  <div class="sc-grid">
+    <div id="scBox"></div>
+    <div id="scSide"></div>
+  </div>
+  <div id="scDetail"></div>
+  <div class="legend">尾巴越淡越舊;每一段紅 = 這一步 Y 上升(轉強)、綠 = 下降(轉弱)。泡泡 = 當日成交金額,點泡泡或右側名單可多選(下方攤開 X/Y 走勢),拉桿回到過去任一天、▶ 看輪動。</div>
 </div>
 
 <div class="view" id="v-theme" style="display:none;">
@@ -247,7 +270,10 @@
       <dt>成交比重</dt><dd>該類股當日成交金額 / 全市場成交金額。</dd>
       <dt>新 / 疲(主題交棒)</dt><dd>全部子類股各自依 1m%、3m% 排名。<b>新</b> = 1m 前 10 但 3m 不在前 10(新主題通常先出現在 1m,幾週後才擠進 3m);<b>疲</b> = 3m 前 10 但 1m 掉到後半(3m 窗口長、還掛在榜上,但最近一個月已經轉弱)。表格上方那行摘要就是這兩組名單,滑鼠移到徽章上看名次。題材榜同一套,但排名母體是當下檔數/量/大類濾網後的題材(薄類太多,全排會被小題材洗版),改濾網名單會跟著變。</dd>
       <dt>磁磚(市場地圖)</dt><dd>面積 = 當日成交金額,顏色 = 所選尺度漲跌(紅漲綠跌);深淺是相對強弱,用全體 p90 標準化,不是絕對值。</dd>
-      <dt>散點象限</dt><dd>X 長天期、Y 短天期。<b>右下</b>(長強短弱)= 大漲後休息,旗形在此形成,獵場;<b>右上</b>= 正在噴,只買突破不追價;<b>左上</b>= 補漲,不做;左下無視。</dd>
+      <dt>散點軌跡</dt><dd>尾巴每一點 = 那天跑報表會看到的位置(同一套算法 as-of 重算,權重用當天成交金額),所以最後一點就是今天的散點。步長「週」= 每 5 個交易日取一點,1w 這種短天期逐日看會鋸齒很重。</dd>
+      <dt>RRG(預設)</dt><dd>X = 類股 3m% − 加權指數 3m%(相對大盤超額)取 5 日均,Y = X 的 5 交易日變化(超額在擴大還是縮小)。3m 超額每天會被基準日滾動拉著跳,不平滑的話差分出來全是噪音。順時針輪動:<b>改善</b>(左上)→ <b>領先</b>(右上)→ <b>轉弱</b>(右下)→ <b>落後</b>(左下)。把大盤 beta 拿掉,多頭時不會整片擠在右上;轉強/轉弱名單直接排當下 Y。</dd>
+      <dt>3m × 1w / 1m 象限</dt><dd>X 長天期、Y 短天期。<b>右下</b>(長強短弱)= 大漲後休息,旗形在此形成,獵場;<b>右上</b>= 正在噴,只買突破不追價;<b>左上</b>= 補漲,不做;左下無視。轉強/轉弱名單排的是 Y 在整條尾巴的變化。</dd>
+      <dt>象限交棒</dt><dd>尾巴起點 → 現在換了象限的類股。原軸看「休息 → 再噴發」「噴完 → 進獵場」「長線翻正/負」;RRG 看順時針四個轉換。</dd>
       <dt>量 ≥ N 億(散點)</dt><dd>只畫成交金額達標的類股。87 個子類股裡一堆 3~5 檔的小類,不濾掉圖會糊成一片。</dd>
     </dl>
 
@@ -286,6 +312,7 @@
 <script src="data.js"></script>
 <script src="scanner.js"></script>
 <script src="themes.js"></script>
+<script src="trails.js"></script>
 <script>
 const R = window.REPORT;
 const METRICS = ['d','w1','m1','m3','m6','m12'];
@@ -565,47 +592,198 @@ function niceTicks(mn, mx, n) {
   return out;
 }
 const SC_TSTEPS = [0, 1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500];
+// 軌跡資料 docs/trails.js:每點 = 那天 as-of 的報表值,最後一點即今天的散點。
+// RRG:X = 類股 3m − 加權 3m(相對大盤超額),Y = X 的 5 交易日變化;順時針 改善→領先→轉弱→落後。
+const TR = window.TRAILS || { dates: [], taiex: { m3: [] }, sectors: {} };
+const TN = TR.dates.length;
+const SC_Q = { raw: { RU: '噴發', RD: '休息', LU: '補漲', LD: '弱勢' }, rrg: { RU: '領先', RD: '轉弱', LU: '改善', LD: '落後' } };
+const sc = { end: TN - 1, sel: new Set(), hover: null, timer: null };
+const scMode = () => document.getElementById('scMode').value;
+const scStep = () => +document.getElementById('scStep').value;
+const scTail = () => +document.getElementById('scTail').value;
+function scXY(s, i) {
+  const t = TR.sectors[s.code];
+  if (!t || i < 0) return null;
+  if (scMode() === 'rrg') {
+    // 3m 超額每天會被基準日滾動拉著跳,差分後噪音更大 → 先取 5 日均再差分(正統 RRG 也是吃平滑過的 RS)
+    const ex = j => j < 0 || t.m3[j] == null || TR.taiex.m3[j] == null ? null : t.m3[j] - TR.taiex.m3[j];
+    const ma = j => { let sum = 0; for (let q = j - 4; q <= j; q++) { const v = ex(q); if (v == null) return null; sum += v; } return sum / 5; };
+    const x = ma(i), xp = ma(i - 5);
+    return x == null || xp == null ? null : [x, x - xp];
+  }
+  const x = t.m3[i], y = t[scMode()][i];
+  return x == null || y == null ? null : [x, y];
+}
+const scQuad = p => (p[0] >= 0 ? 'R' : 'L') + (p[1] >= 0 ? 'U' : 'D');
+const scQName = p => SC_Q[scMode() === 'rrg' ? 'rrg' : 'raw'][scQuad(p)];
+function scTailPts(s) {
+  const out = [];
+  for (let k = scTail(); k >= 0; k--) { const i = sc.end - k * scStep(), p = scXY(s, i); if (p) out.push({ i, p }); }
+  return out;
+}
+function scQuantile(a, q) { const b = a.slice().sort((x, y) => x - y); return b[Math.round(q * (b.length - 1))]; }
 function renderScatter() {
-  const kx = document.getElementById('scX').value, ky = document.getElementById('scY').value;
   const minT = SC_TSTEPS[+document.getElementById('scMinT').value];
-  const all = filtered().filter(s => s[kx] != null && s[ky] != null);
+  const rrg = scMode() === 'rrg';
+  const all = filtered().filter(s => scXY(s, sc.end));
   const rows = all.filter(s => s.turnover >= minT * 1e8);
   document.getElementById('scMinTv').textContent = minT + ' 億';
+  document.getElementById('scTailv').textContent = scTail() + (scStep() === 5 ? ' 週' : ' 日');
+  document.getElementById('scEndv').textContent = (TR.dates[sc.end] || '--') + (sc.end === TN - 1 ? '(最新)' : '');
   document.getElementById('scCount').textContent = rows.length + ' / ' + all.length + ' 類股';
-  if (!rows.length) { document.getElementById('scBox').innerHTML = ''; return; }
-  const W = 980, H = 520, M = { l: 56, r: 20, t: 16, b: 40 };
-  let xmn = Math.min(0, ...rows.map(s => s[kx])), xmx = Math.max(0, ...rows.map(s => s[kx]));
-  let ymn = Math.min(0, ...rows.map(s => s[ky])), ymx = Math.max(0, ...rows.map(s => s[ky]));
-  const xp = (xmx - xmn) * 0.08 || 1, yp = (ymx - ymn) * 0.08 || 1;
+  if (!rows.length) { for (const id of ['scBox', 'scSide']) document.getElementById(id).innerHTML = ''; renderScDetail(); return; }
+  // 軸域固定在這批類股整段期間的 1%~99% 分位:拉時間軸 / 播放時不會跳,極端值裁掉
+  const xs = [0], ys = [0];
+  for (const s of rows) for (let i = 0; i < TN; i++) { const p = scXY(s, i); if (p) { xs.push(p[0]); ys.push(p[1]); } }
+  let xmn = Math.min(0, scQuantile(xs, 0.01)), xmx = Math.max(0, scQuantile(xs, 0.99));
+  let ymn = Math.min(0, scQuantile(ys, 0.01)), ymx = Math.max(0, scQuantile(ys, 0.99));
+  const xp = (xmx - xmn) * 0.06 || 1, yp = (ymx - ymn) * 0.06 || 1;
   xmn -= xp; xmx += xp; ymn -= yp; ymx += yp;
+  const W = 980, H = 540, M = { l: 50, r: 16, t: 16, b: 34 };
   const X = v => M.l + (v - xmn) / (xmx - xmn) * (W - M.l - M.r);
   const Y = v => H - M.b - (v - ymn) / (ymx - ymn) * (H - M.t - M.b);
   const maxT = Math.max(...rows.map(s => s.turnover), 1);
-  const labelSet = new Set(rows.slice().sort((a, b) => b.turnover - a.turnover).slice(0, 14));
-  let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;">';
-  for (const t of niceTicks(xmn, xmx, 8)) g += '<line x1="' + X(t) + '" x2="' + X(t) + '" y1="' + M.t + '" y2="' + (H - M.b) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
-    '<text x="' + X(t) + '" y="' + (H - M.b + 16) + '" font-size="11" fill="' + TH.axis + '" text-anchor="middle">' + t + '</text>';
-  for (const t of niceTicks(ymn, ymx, 7)) g += '<line y1="' + Y(t) + '" y2="' + Y(t) + '" x1="' + M.l + '" x2="' + (W - M.r) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
-    '<text x="' + (M.l - 8) + '" y="' + (Y(t) + 4) + '" font-size="11" fill="' + TH.axis + '" text-anchor="end">' + t + '</text>';
-  g += '<text x="' + (W - M.r) + '" y="' + (H - M.b - 8) + '" font-size="12" fill="' + TH.text2 + '" text-anchor="end">' + LBL[kx] + '</text>';
-  g += '<text x="' + (M.l + 8) + '" y="' + (M.t + 12) + '" font-size="12" fill="' + TH.text2 + '">' + LBL[ky] + '</text>';
-  for (const s of rows.slice().sort((a, b) => b.turnover - a.turnover)) {
-    const r = 3 + 17 * Math.sqrt(s.turnover / maxT);
-    const a = Math.min(Math.abs(s.d ?? 0) / SCALE_SEC.d, 1) * 0.75 + 0.1;
-    const col = (s.d ?? 0) >= 0 ? TH.up : TH.down;
-    g += '<circle cx="' + X(s[kx]).toFixed(1) + '" cy="' + Y(s[ky]).toFixed(1) + '" r="' + r.toFixed(1) +
-      '" fill="rgba(' + col + ',' + a.toFixed(2) + ')" stroke="rgba(' + col + ',0.9)" stroke-width="0.8">' +
-      '<title>' + s.name + '&#10;' + LBL[kx] + ' ' + fmt(s[kx]) + ' / ' + LBL[ky] + ' ' + fmt(s[ky]) +
-      '&#10;當日 ' + fmt(s.d) + '% ・ 成交 ' + (s.turnover / 1e8).toFixed(0) + ' 億</title></circle>';
-    if (labelSet.has(s)) g += '<text x="' + X(s[kx]).toFixed(1) + '" y="' + (Y(s[ky]) - r - 3).toFixed(1) +
-      '" font-size="11" fill="' + TH.text2 + '" text-anchor="middle">' + s.name + '</text>';
+  const focus = new Set(sc.sel); if (sc.hover) focus.add(sc.hover);
+  const dim = focus.size > 0, tails = document.getElementById('scTails').value;
+  const labelSet = new Set(rows.slice().sort((a, b) => b.turnover - a.turnover).slice(0, 12).map(s => s.code));
+  for (const c of focus) labelSet.add(c);
+  const drawTail = (s, f) => tails === 'all' || f || (tails === 'top' && labelSet.has(s.code));
+  let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;display:block;"><defs><clipPath id="scClip"><rect x="' + M.l + '" y="' + M.t +
+    '" width="' + (W - M.l - M.r) + '" height="' + (H - M.t - M.b) + '"/></clipPath></defs>';
+  // 象限名稱;原軸的右下(獵場)/ RRG 的左上(改善)打底色
+  const zx = X(0), zy = Y(0), qn = SC_Q[rrg ? 'rrg' : 'raw'], shade = rrg ? 'LU' : 'RD';
+  for (const [k, rx, ry, rw, rh, tx, ty, anc] of [
+    ['RU', zx, M.t, W - M.r - zx, zy - M.t, W - M.r - 8, M.t + 14, 'end'],
+    ['RD', zx, zy, W - M.r - zx, H - M.b - zy, W - M.r - 8, H - M.b - 8, 'end'],
+    ['LU', M.l, M.t, zx - M.l, zy - M.t, M.l + 8, M.t + 14, 'start'],
+    ['LD', M.l, zy, zx - M.l, H - M.b - zy, M.l + 8, H - M.b - 8, 'start']]) {
+    if (k === shade) g += '<rect x="' + rx + '" y="' + ry + '" width="' + Math.max(0, rw) + '" height="' + Math.max(0, rh) + '" fill="' + TH.grid + '" opacity="0.6"/>';
+    g += '<text x="' + tx + '" y="' + ty + '" font-size="12" fill="' + TH.text2 + '" text-anchor="' + anc + '">' + qn[k] + (!rrg && k === 'RD' ? '・獵場' : '') + '</text>';
   }
-  g += '</svg>';
+  for (const t of niceTicks(xmn, xmx, 9)) g += '<line x1="' + X(t) + '" x2="' + X(t) + '" y1="' + M.t + '" y2="' + (H - M.b) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
+    '<text x="' + X(t) + '" y="' + (H - M.b + 15) + '" font-size="11" fill="' + TH.axis + '" text-anchor="middle">' + t + '</text>';
+  for (const t of niceTicks(ymn, ymx, 7)) g += '<line y1="' + Y(t) + '" y2="' + Y(t) + '" x1="' + M.l + '" x2="' + (W - M.r) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
+    '<text x="' + (M.l - 7) + '" y="' + (Y(t) + 4) + '" font-size="11" fill="' + TH.axis + '" text-anchor="end">' + t + '</text>';
+  const lx = rrg ? '3m 超額%(類股 − 加權)' : '3m%', ly = rrg ? '超額 5 日變化' : LBL[scMode()];
+  g += '<text x="' + (W - M.r) + '" y="' + (H - 4) + '" font-size="11.5" fill="' + TH.text2 + '" text-anchor="end">' + lx + ' →</text>';
+  g += '<text x="' + M.l + '" y="' + (M.t - 4) + '" font-size="11.5" fill="' + TH.text2 + '">↑ ' + ly + '</text>';
+  g += '<g clip-path="url(#scClip)">';
+  const heads = [];
+  for (const s of rows.slice().sort((a, b) => a.turnover - b.turnover)) {
+    const pts = scTailPts(s), f = focus.has(s.code), op = dim && !f ? 0.18 : 1;
+    if (drawTail(s, f)) for (let j = 1; j < pts.length; j++) {
+      const a = pts[j - 1].p, b = pts[j].p, age = j / (pts.length - 1);
+      const col = b[1] >= a[1] ? TH.up : TH.down;
+      g += '<line x1="' + X(a[0]).toFixed(1) + '" y1="' + Y(a[1]).toFixed(1) + '" x2="' + X(b[0]).toFixed(1) + '" y2="' + Y(b[1]).toFixed(1) +
+        '" stroke="rgba(' + col + ',' + ((0.12 + 0.78 * age) * op).toFixed(2) + ')" stroke-width="' + (f ? 2.4 : 1.3) + '" stroke-linecap="round"/>';
+      if (f) g += '<circle cx="' + X(a[0]).toFixed(1) + '" cy="' + Y(a[1]).toFixed(1) + '" r="2.2" fill="rgba(' + col + ',' + (0.3 + 0.6 * age).toFixed(2) + ')"/>';
+    }
+    heads.push({ s, pts, f, op });
+  }
+  for (const { s, pts, f, op } of heads) {
+    const h = pts[pts.length - 1].p, prev = pts.length > 1 ? pts[pts.length - 2].p : h;
+    const col = h[1] >= prev[1] ? TH.up : TH.down;
+    const r = 3 + 15 * Math.sqrt(s.turnover / maxT), a = pts[0];
+    g += '<circle data-k="' + s.code + '" cx="' + X(h[0]).toFixed(1) + '" cy="' + Y(h[1]).toFixed(1) + '" r="' + r.toFixed(1) +
+      '" fill="rgba(' + col + ',' + (0.35 * op).toFixed(2) + ')" stroke="rgba(' + col + ',' + (0.95 * op).toFixed(2) + ')" stroke-width="' + (f ? 2 : 0.8) + '" style="cursor:pointer;">' +
+      '<title>' + s.name + '(' + s.parent + ')・成交 ' + (s.turnover / 1e8).toFixed(0) + ' 億' +
+      '&#10;' + TR.dates[a.i] + ' ' + scQName(a.p) + ' (' + fmt(a.p[0]) + ', ' + fmt(a.p[1]) + ')' +
+      '&#10;' + TR.dates[sc.end] + ' ' + scQName(h) + ' (' + fmt(h[0]) + ', ' + fmt(h[1]) + ')</title></circle>';
+    if (labelSet.has(s.code) && (!dim || f)) g += '<text x="' + X(h[0]).toFixed(1) + '" y="' + (Y(h[1]) - r - 4).toFixed(1) +
+      '" font-size="' + (f ? 12.5 : 11) + '" font-weight="' + (f ? 600 : 400) + '" fill="' + (f ? TH.cline : TH.text2) + '" text-anchor="middle" pointer-events="none">' + s.name + '</text>';
+  }
+  g += '</g></svg>';
   document.getElementById('scBox').innerHTML = g;
+  renderScSide(rows);
+  renderScDetail();
 }
-document.getElementById('scMinT').oninput = renderScatter;
-document.getElementById('scX').onchange = renderScatter;
-document.getElementById('scY').onchange = renderScatter;
+// 右側:轉強 / 轉弱 / 象限交棒(尾巴起點 → 現在)
+function renderScSide(rows) {
+  const rrg = scMode() === 'rrg';
+  const ms = rows.map(s => {
+    const pts = scTailPts(s);
+    if (pts.length < 2) return null;
+    const a = pts[0].p, b = pts[pts.length - 1].p;
+    // RRG 的 Y 本身就是「超額在擴大/縮小」→ 排當下 Y;原軸排 Y 在整條尾巴的變化
+    return { s, a, b, score: rrg ? b[1] : b[1] - a[1] };
+  }).filter(Boolean);
+  const li = m => '<div class="sc-li' + (sc.sel.has(m.s.code) ? ' on' : '') + '" data-k="' + m.s.code + '" title="' + m.s.parent +
+    ' ・ X ' + fmt(m.a[0]) + '→' + fmt(m.b[0]) + ' ・ Y ' + fmt(m.a[1]) + '→' + fmt(m.b[1]) + '"><span class="n">' + m.s.name + '</span>' +
+    '<span class="q">' + (scQuad(m.a) !== scQuad(m.b) ? scQName(m.a) + '→' : '') + scQName(m.b) + '</span>' +
+    '<span class="v" style="color:rgb(' + (m.score >= 0 ? TH.up : TH.down) + ')">' + (m.score > 0 ? '+' : '') + m.score.toFixed(1) + '</span></div>';
+  const hdr = rrg ? '超額 5 日變化' : 'Y 變化(整條尾巴)';
+  let h = '<h5>轉強<span>' + hdr + '</span></h5>' + ms.slice().sort((a, b) => b.score - a.score).slice(0, 8).map(li).join('') +
+    '<h5>轉弱<span>' + hdr + '</span></h5>' + ms.slice().sort((a, b) => a.score - b.score).slice(0, 8).map(li).join('') +
+    '<h5>象限交棒<span>尾巴起點 → 現在</span></h5>';
+  const TRANS = rrg
+    ? [['LU>RU', '改善 → 領先'], ['RU>RD', '領先 → 轉弱'], ['RD>LD', '轉弱 → 落後'], ['LD>LU', '落後 → 改善']]
+    : [['RD>RU', '休息 → 再噴發'], ['RU>RD', '噴完 → 進獵場'], ['L>R', '長線翻正'], ['R>L', '長線翻負']];
+  for (const [k, label] of TRANS) {
+    const hit = ms.filter(m => {
+      const qa = scQuad(m.a), qb = scQuad(m.b);
+      return k.length === 3 ? qa[0] === k[0] && qb[0] === k[2] : qa + '>' + qb === k;
+    }).sort((a, b) => b.s.turnover - a.s.turnover);
+    h += '<div class="sub" style="margin:5px 0 1px;"><b>' + label + '</b> ・ ' + hit.length + '</div>' + hit.slice(0, 6).map(li).join('');
+  }
+  document.getElementById('scSide').innerHTML = h;
+}
+// 下方:選取類股整段期間的 X / Y 走勢(底色 = 目前尾巴涵蓋區間,直線 = 截至日)
+function renderScDetail() {
+  const el = document.getElementById('scDetail');
+  const secs = [...sc.sel].slice(-4).map(c => R.sectors.find(s => s.code === c)).filter(Boolean);
+  if (!secs.length) { el.innerHTML = '<span class="sub">點泡泡或右側名單選類股,這裡攤開它整段期間的 X / Y 走勢。</span>'; return; }
+  const first = Math.max(0, sc.end - scTail() * scStep()), rrg = scMode() === 'rrg';
+  const spark = (vals, color) => {
+    const w = 300, h = 44, v = vals.filter(x => x != null);
+    if (!v.length) return '';
+    let mn = Math.min(0, ...v), mx = Math.max(0, ...v); if (mx === mn) mx = mn + 1;
+    const X = i => i / (TN - 1) * w, Y = x => h - 3 - (x - mn) / (mx - mn) * (h - 6);
+    let d = '', on = false;
+    vals.forEach((x, i) => { if (x == null) { on = false; return; } d += (on ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x).toFixed(1); on = true; });
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none"><rect x="' + X(first) + '" y="0" width="' + Math.max(1, X(sc.end) - X(first)) + '" height="' + h + '" fill="' + TH.grid + '"/>' +
+      '<line x1="0" x2="' + w + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="' + TH.zero + '" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.5" vector-effect="non-scaling-stroke"/>' +
+      '<line x1="' + X(sc.end) + '" x2="' + X(sc.end) + '" y1="0" y2="' + h + '" stroke="#2962ff" vector-effect="non-scaling-stroke"/></svg>';
+  };
+  el.innerHTML = '<div class="sub" style="margin-bottom:4px;">' + TR.dates[0] + ' → ' + TR.dates[TN - 1] + '</div>' + secs.map(s => {
+    const xs = [], ys = [];
+    for (let i = 0; i < TN; i++) { const p = scXY(s, i); xs.push(p ? p[0] : null); ys.push(p ? p[1] : null); }
+    const p = scXY(s, sc.end);
+    return '<div class="sc-drow"><div><b>' + s.name + '</b><div class="sub">' + s.parent + (p ? ' ・ ' + scQName(p) : '') + '</div></div>' +
+      '<div><div class="sub">' + (rrg ? '3m 超額' : '3m') + ' ' + fmt(p && p[0]) + '</div>' + spark(xs, TH.axis) + '</div>' +
+      '<div><div class="sub">' + (rrg ? '超額 5 日變化' : LBL[scMode()]) + ' ' + fmt(p && p[1]) + '</div>' + spark(ys, '#2962ff') + '</div></div>';
+  }).join('');
+}
+function scStop() { clearInterval(sc.timer); sc.timer = null; document.getElementById('scPlay').textContent = '▶ 播放'; }
+const scEnd = document.getElementById('scEnd');
+scEnd.min = 0; scEnd.max = Math.max(0, TN - 1); scEnd.value = TN - 1;
+scEnd.oninput = () => { sc.end = +scEnd.value; renderScatter(); };
+document.getElementById('scPlay').onclick = () => {
+  if (sc.timer) return scStop();
+  if (sc.end >= TN - 1) sc.end = Math.min(TN - 1, scTail() * scStep());
+  document.getElementById('scPlay').textContent = '❚❚ 暫停';
+  sc.timer = setInterval(() => {
+    if (view !== 'scatter' || sc.end >= TN - 1) return scStop();
+    sc.end++; scEnd.value = sc.end; renderScatter();
+  }, 110);
+};
+document.getElementById('scClear').onclick = () => { sc.sel.clear(); renderScatter(); };
+for (const id of ['scMinT', 'scTail']) document.getElementById(id).oninput = renderScatter;
+for (const id of ['scMode', 'scTails']) document.getElementById(id).onchange = renderScatter;
+document.getElementById('scStep').onchange = () => { document.getElementById('scTail').value = scStep() === 5 ? 6 : 20; renderScatter(); };
+const scToggle = e => {
+  const el = e.target.closest('[data-k]');
+  if (!el) return;
+  sc.sel.has(el.dataset.k) ? sc.sel.delete(el.dataset.k) : sc.sel.add(el.dataset.k);
+  renderScatter();
+};
+document.getElementById('scBox').onclick = scToggle;
+document.getElementById('scSide').onclick = scToggle;
+document.getElementById('scBox').onmouseover = e => {
+  const c = e.target.closest('circle[data-k]'), k = c ? c.dataset.k : null;
+  if (k !== sc.hover) { sc.hover = k; renderScatter(); }
+};
+document.getElementById('scBox').onmouseleave = () => { if (sc.hover) { sc.hover = null; renderScatter(); } };
 
 // ---------- 題材榜(MoneyDJ 細產業) ----------
 const TH_LIST = ((window.THEMES || {}).list) || [];

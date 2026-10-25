@@ -421,6 +421,59 @@ for (const { id, s, rank } of universe) {
 writeFileSync(join(ROOT, 'docs', 'scanner.js'),
   'window.SCANNER=' + JSON.stringify({ date: latestDate, universe: universe.length, stocks: scanStocks }) + ';', 'utf8');
 
+// ---------- docs/trails.js(動能散點軌跡:近 130 個保留日,每天 as-of 重算類股 3m/1m/1w) ----------
+// 每一點 = 那天跑報表會得到的值(成分股當天有成交才計、權重 = 當天成交金額占比、基準日同 TARGETS 規則),
+// 所以軌跡最後一點就是今天的散點。不用連鎖指數:它跟報表口徑差很大(2026-10-22 PCB-材料設備 3m
+// 連鎖 23% vs 報表 43%,報表拿今天的量加權會偏向近期爆量的贏家),頭對不上散點會讓人看不懂。
+{
+  const TRAIL_N = 130;
+  const tDays = [];
+  for (let i = T; i >= 0 && tDays.length < TRAIL_N; i--) if (!dropped[i]) tDays.unshift(i);
+  const HZ = { m3: d => minusMonths(d, 3), m1: d => minusMonths(d, 1), w1: d => minusDays(d, 7) };
+  const bases = tDays.map(t => Object.fromEntries(Object.entries(HZ).map(([k, f]) => {
+    const target = f(dates[t]);
+    let i = t; while (i >= 0 && dates[i] > target) i--;
+    return [k, i];
+  })));
+  // 個股在第 t 天的序列位置(當天沒成交 = -1)
+  const posOf = (s, t) => {
+    let lo = 0, hi = s.pos.length - 1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (s.pos[mid] === t) return mid; if (s.pos[mid] < t) lo = mid + 1; else hi = mid - 1; }
+    return -1;
+  };
+  const trailSecs = {};
+  for (const cat of categories) {
+    const ids = cat.stocks.map(x => x.id).filter(id => series.has(id));
+    const out = { m3: [], m1: [], w1: [] };
+    tDays.forEach((t, n) => {
+      const acc = { m3: [0, 0], m1: [0, 0], w1: [0, 0] };
+      for (const id of ids) {
+        const s = series.get(id), j = posOf(s, t);
+        if (j < 0) continue;
+        for (const k in acc) {
+          const cb = cumAt(id, bases[n][k]);
+          if (cb != null) { acc[k][0] += s.to[j] * (s.cum[j] / cb - 1); acc[k][1] += s.to[j]; }
+        }
+      }
+      for (const k in acc) out[k].push(acc[k][1] > 0 ? +(acc[k][0] / acc[k][1] * 100).toFixed(1) : null);
+    });
+    trailSecs[cat.code] = out;
+  }
+  // RRG 的基準:加權指數同口徑 as-of 報酬(價格指數,基準日沒值就往前找)
+  const tx = new Map();
+  if (existsSync(idxFile)) for (const l of readFileSync(idxFile, 'utf8').split('\n').slice(1)) {
+    const [d, v] = l.split(',');
+    if (d && +v > 0) tx.set(d, +v);
+  }
+  const txAt = i => { while (i >= 0 && !tx.has(dates[i])) i--; return i >= 0 ? tx.get(dates[i]) : null; };
+  const taiex = Object.fromEntries(Object.keys(HZ).map(k => [k, tDays.map((t, n) => {
+    const a = tx.get(dates[t]), b = txAt(bases[n][k]);
+    return a && b ? +((a / b - 1) * 100).toFixed(1) : null;
+  })]));
+  writeFileSync(join(ROOT, 'docs', 'trails.js'),
+    'window.TRAILS=' + JSON.stringify({ date: latestDate, dates: tDays.map(t => dates[t]), taiex, sectors: trailSecs }) + ';', 'utf8');
+}
+
 // ---------- docs/themes.js(MoneyDJ 細產業:題材標籤 + 題材熱度榜) ----------
 // MoneyDJ 一檔平均屬 3.5 個細產業(鴻海 32 個),多重歸屬不能用成交金額加權 —— 同一檔會同時
 // 帶動它所屬的每一類,看起來像一排題材同時發動。改用成分股漲幅「中位數」:單檔綁架不了整個
