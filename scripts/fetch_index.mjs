@@ -1,4 +1,6 @@
 // Fetch 加權指數(TWSE FMTQIK,按月) + 櫃買指數(TPEX highlight,按日) -> data/market_index.csv
+// 加權報酬指數(TWSE MFI94U,按月,含息)-> data/taiex_tr.csv:動能散點 RRG 的基準(類股是還原權息,
+// 比價格指數會在除息季灌水)。另開檔不併進 market_index.csv —— 那份是四個 repo 的交易日曆。
 // Usage:
 //   node scripts/fetch_index.mjs                 -> 本月(增量)
 //   node scripts/fetch_index.mjs --backfill 380  -> 過去 N 天
@@ -8,6 +10,7 @@ import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'data', 'market_index.csv');
+const TR_OUT = join(ROOT, 'data', 'taiex_tr.csv');
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0', 'Accept': 'application/json' };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -53,6 +56,11 @@ async function main() {
   const start = new Date(new Date(today).getTime() - days * 86400e3).toISOString().slice(0, 10);
   const map = load();
   const get = d => { if (!map.has(d)) map.set(d, { taiex: null, otc: null }); return map.get(d); };
+  const tr = new Map();
+  if (existsSync(TR_OUT)) for (const ln of readFileSync(TR_OUT, 'utf8').split('\n').slice(1)) {
+    const [date, v] = ln.split(',');
+    if (date && +v > 0) tr.set(date, +v);
+  }
 
   // TAIEX:FMTQIK 按月
   let cur = new Date(start.slice(0, 7) + '-01T00:00:00Z');
@@ -71,6 +79,18 @@ async function main() {
       process.stderr.write(`TAIEX ${ym}: ${n} days\n`);
     } catch (e) {
       process.stderr.write(`TAIEX ${ym}: ERROR ${e.message}\n`);
+    }
+    try {
+      // 欄名是「日　期」(夾全形空白),直接用位置
+      const j = await fetchJson(`https://www.twse.com.tw/rwd/zh/TAIEX/MFI94U?date=${ym}01&response=json`);
+      let n = 0;
+      for (const r of j.data || []) {
+        const date = rocToIso(r[0]), v = num(r[1]);
+        if (date && v) { tr.set(date, v); n++; }
+      }
+      process.stderr.write(`TAIEX TR ${ym}: ${n} days\n`);
+    } catch (e) {
+      process.stderr.write(`TAIEX TR ${ym}: ERROR ${e.message}\n`);
     }
     cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 1));
     await sleep(400);
@@ -101,6 +121,9 @@ async function main() {
     .map(([d, v]) => `${d},${v.taiex ?? ''},${v.otc ?? ''}`);
   writeFileSync(OUT, ['date,taiex,otc', ...rows].join('\n'), 'utf8');
   process.stderr.write(`Saved ${rows.length} rows -> ${OUT}\n`);
+  const trRows = [...tr.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([d, v]) => `${d},${v}`);
+  writeFileSync(TR_OUT, ['date,taiex_tr', ...trRows].join('\n'), 'utf8');
+  process.stderr.write(`Saved ${trRows.length} rows -> ${TR_OUT}\n`);
 }
 
 main();

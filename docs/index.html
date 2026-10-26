@@ -172,7 +172,7 @@
 <div class="view" id="v-scatter" style="display:none;">
   <div class="crumb">
     <label class="sub">座標:<select id="scMode">
-      <option value="rrg" selected>RRG 相對大盤</option><option value="w1">3m × 1w</option><option value="m1">3m × 1m</option>
+      <option value="rrg" selected>RRG 相對大盤</option><option value="w1">3m × 1w</option>
     </select></label>
     <label class="sub">步長:<select id="scStep"><option value="5" selected>週</option><option value="1">日</option></select></label>
     <label class="sub">尾長 <input type="range" id="scTail" min="0" max="20" step="1" value="6" style="width:90px;vertical-align:middle;"><b id="scTailv" style="display:inline-block;min-width:36px;"></b></label>
@@ -271,8 +271,8 @@
       <dt>新 / 疲(主題交棒)</dt><dd>全部子類股各自依 1m%、3m% 排名。<b>新</b> = 1m 前 10 但 3m 不在前 10(新主題通常先出現在 1m,幾週後才擠進 3m);<b>疲</b> = 3m 前 10 但 1m 掉到後半(3m 窗口長、還掛在榜上,但最近一個月已經轉弱)。表格上方那行摘要就是這兩組名單,滑鼠移到徽章上看名次。題材榜同一套,但排名母體是當下檔數/量/大類濾網後的題材(薄類太多,全排會被小題材洗版),改濾網名單會跟著變。</dd>
       <dt>磁磚(市場地圖)</dt><dd>面積 = 當日成交金額,顏色 = 所選尺度漲跌(紅漲綠跌);深淺是相對強弱,用全體 p90 標準化,不是絕對值。</dd>
       <dt>散點軌跡</dt><dd>尾巴每一點 = 那天跑報表會看到的位置(同一套算法 as-of 重算,權重用當天成交金額),所以最後一點就是今天的散點。步長「週」= 每 5 個交易日取一點,1w 這種短天期逐日看會鋸齒很重。</dd>
-      <dt>RRG(預設)</dt><dd>X = 類股 3m% − 加權指數 3m%(相對大盤超額)取 5 日均,Y = X 的 5 交易日變化(超額在擴大還是縮小)。3m 超額每天會被基準日滾動拉著跳,不平滑的話差分出來全是噪音。順時針輪動:<b>改善</b>(左上)→ <b>領先</b>(右上)→ <b>轉弱</b>(右下)→ <b>落後</b>(左下)。把大盤 beta 拿掉,多頭時不會整片擠在右上;轉強/轉弱名單直接排當下 Y。</dd>
-      <dt>3m × 1w / 1m 象限</dt><dd>X 長天期、Y 短天期。<b>右下</b>(長強短弱)= 大漲後休息,旗形在此形成,獵場;<b>右上</b>= 正在噴,只買突破不追價;<b>左上</b>= 補漲,不做;左下無視。轉強/轉弱名單排的是 Y 在整條尾巴的變化。</dd>
+      <dt>RRG(預設)</dt><dd>相對強度線 RS = 類股連鎖指數 ÷ 加權<b>報酬</b>指數(含息;類股是還原權息,比價格指數會在除息季替高殖利率類股灌水)。X = RS 高於自己 63 日均線幾 %(取 5 日均),Y = X 的 5 交易日變化(相對強勢在擴大還是縮小)。不用「類股 3m − 加權 3m」:滾動 3m 報酬差分後等於「最近 5 日 − 三個月前剛滾出窗口的 5 日」,轉強/轉弱會被三個月前的行情帶著走。連鎖指數權重用前一日成交金額,所以 RRG 的 X 跟表格的 3m% 不是同一個數。順時針輪動:<b>改善</b>(左上)→ <b>領先</b>(右上)→ <b>轉弱</b>(右下)→ <b>落後</b>(左下)。把大盤 beta 拿掉,多頭時不會整片擠在右上;轉強/轉弱名單直接排當下 Y。</dd>
+      <dt>3m × 1w 象限</dt><dd>X 長天期、Y 短天期(1m 當 Y 跟上面的新/疲徽章重疊,已拿掉)。<b>右下</b>(長強短弱)= 大漲後休息,旗形在此形成,獵場;<b>右上</b>= 正在噴,只買突破不追價;<b>左上</b>= 補漲,不做;左下無視。轉強/轉弱名單排的是 Y 在整條尾巴的變化。</dd>
       <dt>象限交棒</dt><dd>尾巴起點 → 現在換了象限的類股。原軸看「休息 → 再噴發」「噴完 → 進獵場」「長線翻正/負」;RRG 看順時針四個轉換。</dd>
       <dt>量 ≥ N 億(散點)</dt><dd>只畫成交金額達標的類股。87 個子類股裡一堆 3~5 檔的小類,不濾掉圖會糊成一片。</dd>
     </dl>
@@ -593,29 +593,23 @@ function niceTicks(mn, mx, n) {
 }
 const SC_TSTEPS = [0, 1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500];
 // 軌跡資料 docs/trails.js:每點 = 那天 as-of 的報表值,最後一點即今天的散點。
-// RRG:X = 類股 3m − 加權 3m(相對大盤超額),Y = X 的 5 交易日變化;順時針 改善→領先→轉弱→落後。
-const TR = window.TRAILS || { dates: [], taiex: { m3: [] }, sectors: {} };
+// RRG:rx/ry 由 build 預算(RS = 類股連鎖指數 / 加權報酬指數,X = RS 對 63 日均 %,Y = X 的 5 日變化);順時針 改善→領先→轉弱→落後。
+const TR = window.TRAILS || { dates: [], sectors: {} };
 const TN = TR.dates.length;
 const SC_Q = { raw: { RU: '噴發', RD: '休息', LU: '補漲', LD: '弱勢' }, rrg: { RU: '領先', RD: '轉弱', LU: '改善', LD: '落後' } };
-const sc = { end: TN - 1, sel: new Set(), hover: null, timer: null };
+const sc = { end: TN - 1, sel: new Set(), hover: null, timer: null, mode: 'rrg', dom: null };
 const scMode = () => document.getElementById('scMode').value;
 const scStep = () => +document.getElementById('scStep').value;
 const scTail = () => +document.getElementById('scTail').value;
+// sc.mode 在 renderScatter 開頭同步,這裡每點呼叫幾千次,別每次讀 DOM
 function scXY(s, i) {
   const t = TR.sectors[s.code];
   if (!t || i < 0) return null;
-  if (scMode() === 'rrg') {
-    // 3m 超額每天會被基準日滾動拉著跳,差分後噪音更大 → 先取 5 日均再差分(正統 RRG 也是吃平滑過的 RS)
-    const ex = j => j < 0 || t.m3[j] == null || TR.taiex.m3[j] == null ? null : t.m3[j] - TR.taiex.m3[j];
-    const ma = j => { let sum = 0; for (let q = j - 4; q <= j; q++) { const v = ex(q); if (v == null) return null; sum += v; } return sum / 5; };
-    const x = ma(i), xp = ma(i - 5);
-    return x == null || xp == null ? null : [x, x - xp];
-  }
-  const x = t.m3[i], y = t[scMode()][i];
+  const rrg = sc.mode === 'rrg', x = rrg ? t.rx[i] : t.m3[i], y = rrg ? t.ry[i] : t[sc.mode][i];
   return x == null || y == null ? null : [x, y];
 }
 const scQuad = p => (p[0] >= 0 ? 'R' : 'L') + (p[1] >= 0 ? 'U' : 'D');
-const scQName = p => SC_Q[scMode() === 'rrg' ? 'rrg' : 'raw'][scQuad(p)];
+const scQName = p => SC_Q[sc.mode === 'rrg' ? 'rrg' : 'raw'][scQuad(p)];
 function scTailPts(s) {
   const out = [];
   for (let k = scTail(); k >= 0; k--) { const i = sc.end - k * scStep(), p = scXY(s, i); if (p) out.push({ i, p }); }
@@ -624,26 +618,35 @@ function scTailPts(s) {
 function scQuantile(a, q) { const b = a.slice().sort((x, y) => x - y); return b[Math.round(q * (b.length - 1))]; }
 function renderScatter() {
   const minT = SC_TSTEPS[+document.getElementById('scMinT').value];
-  const rrg = scMode() === 'rrg';
+  sc.mode = scMode();
+  const rrg = sc.mode === 'rrg';
   const all = filtered().filter(s => scXY(s, sc.end));
   const rows = all.filter(s => s.turnover >= minT * 1e8);
   document.getElementById('scMinTv').textContent = minT + ' 億';
   document.getElementById('scTailv').textContent = scTail() + (scStep() === 5 ? ' 週' : ' 日');
-  document.getElementById('scEndv').textContent = (TR.dates[sc.end] || '--') + (sc.end === TN - 1 ? '(最新)' : '');
+  document.getElementById('scEndv').textContent = (TR.dates[sc.end] || '--') + (sc.end === TN - 1 ? '(最新)' : '') +
+    (rrg && TR.benchDate && TR.dates[sc.end] > TR.benchDate ? ' ⚠ 報酬指數只到 ' + TR.benchDate + ',基準沿用' : '');
   document.getElementById('scCount').textContent = rows.length + ' / ' + all.length + ' 類股';
   if (!rows.length) { for (const id of ['scBox', 'scSide']) document.getElementById(id).innerHTML = ''; renderScDetail(); return; }
-  // 軸域固定在這批類股整段期間的 1%~99% 分位:拉時間軸 / 播放時不會跳,極端值裁掉
-  const xs = [0], ys = [0];
-  for (const s of rows) for (let i = 0; i < TN; i++) { const p = scXY(s, i); if (p) { xs.push(p[0]); ys.push(p[1]); } }
-  let xmn = Math.min(0, scQuantile(xs, 0.01)), xmx = Math.max(0, scQuantile(xs, 0.99));
-  let ymn = Math.min(0, scQuantile(ys, 0.01)), ymx = Math.max(0, scQuantile(ys, 0.99));
-  const xp = (xmx - xmn) * 0.06 || 1, yp = (ymx - ymn) * 0.06 || 1;
-  xmn -= xp; xmx += xp; ymn -= yp; ymx += yp;
+  // 軸域固定在這批類股整段期間的 1%~99% 分位:拉時間軸 / 播放時不會跳,極端值裁掉。
+  // 只跟 (座標, 類股集合) 有關 → 快取,hover / 播放每幀不重算
+  const domKey = sc.mode + '|' + rows.map(s => s.code).join(',');
+  if (!sc.dom || sc.dom.key !== domKey) {
+    const xs = [0], ys = [0];
+    for (const s of rows) for (let i = 0; i < TN; i++) { const p = scXY(s, i); if (p) { xs.push(p[0]); ys.push(p[1]); } }
+    const xmn = Math.min(0, scQuantile(xs, 0.01)), xmx = Math.max(0, scQuantile(xs, 0.99));
+    const ymn = Math.min(0, scQuantile(ys, 0.01)), ymx = Math.max(0, scQuantile(ys, 0.99));
+    const xp = (xmx - xmn) * 0.06 || 1, yp = (ymx - ymn) * 0.06 || 1;
+    sc.dom = { key: domKey, xmn: xmn - xp, xmx: xmx + xp, ymn: ymn - yp, ymx: ymx + yp };
+  }
+  const { xmn, xmx, ymn, ymx } = sc.dom;
   const W = 980, H = 540, M = { l: 50, r: 16, t: 16, b: 34 };
   const X = v => M.l + (v - xmn) / (xmx - xmn) * (W - M.l - M.r);
   const Y = v => H - M.b - (v - ymn) / (ymx - ymn) * (H - M.t - M.b);
   const maxT = Math.max(...rows.map(s => s.turnover), 1);
-  const focus = new Set(sc.sel); if (sc.hover) focus.add(sc.hover);
+  // 只算還畫在圖上的:選取的類股被量/篩選濾掉後不該讓整張圖變淡
+  const drawn = new Set(rows.map(s => s.code));
+  const focus = new Set([...sc.sel, sc.hover].filter(c => drawn.has(c)));
   const dim = focus.size > 0, tails = document.getElementById('scTails').value;
   const labelSet = new Set(rows.slice().sort((a, b) => b.turnover - a.turnover).slice(0, 12).map(s => s.code));
   for (const c of focus) labelSet.add(c);
@@ -664,7 +667,7 @@ function renderScatter() {
     '<text x="' + X(t) + '" y="' + (H - M.b + 15) + '" font-size="11" fill="' + TH.axis + '" text-anchor="middle">' + t + '</text>';
   for (const t of niceTicks(ymn, ymx, 7)) g += '<line y1="' + Y(t) + '" y2="' + Y(t) + '" x1="' + M.l + '" x2="' + (W - M.r) + '" stroke="' + (t === 0 ? TH.axis : TH.grid) + '"/>' +
     '<text x="' + (M.l - 7) + '" y="' + (Y(t) + 4) + '" font-size="11" fill="' + TH.axis + '" text-anchor="end">' + t + '</text>';
-  const lx = rrg ? '3m 超額%(類股 − 加權)' : '3m%', ly = rrg ? '超額 5 日變化' : LBL[scMode()];
+  const lx = rrg ? '相對強度 vs 63 日均 %' : '3m%', ly = rrg ? '相對強度 5 日變化' : LBL[sc.mode];
   g += '<text x="' + (W - M.r) + '" y="' + (H - 4) + '" font-size="11.5" fill="' + TH.text2 + '" text-anchor="end">' + lx + ' →</text>';
   g += '<text x="' + M.l + '" y="' + (M.t - 4) + '" font-size="11.5" fill="' + TH.text2 + '">↑ ' + ly + '</text>';
   g += '<g clip-path="url(#scClip)">';
@@ -699,7 +702,7 @@ function renderScatter() {
 }
 // 右側:轉強 / 轉弱 / 象限交棒(尾巴起點 → 現在)
 function renderScSide(rows) {
-  const rrg = scMode() === 'rrg';
+  const rrg = sc.mode === 'rrg';
   const ms = rows.map(s => {
     const pts = scTailPts(s);
     if (pts.length < 2) return null;
@@ -711,9 +714,10 @@ function renderScSide(rows) {
     ' ・ X ' + fmt(m.a[0]) + '→' + fmt(m.b[0]) + ' ・ Y ' + fmt(m.a[1]) + '→' + fmt(m.b[1]) + '"><span class="n">' + m.s.name + '</span>' +
     '<span class="q">' + (scQuad(m.a) !== scQuad(m.b) ? scQName(m.a) + '→' : '') + scQName(m.b) + '</span>' +
     '<span class="v" style="color:rgb(' + (m.score >= 0 ? TH.up : TH.down) + ')">' + (m.score > 0 ? '+' : '') + m.score.toFixed(1) + '</span></div>';
-  const hdr = rrg ? '超額 5 日變化' : 'Y 變化(整條尾巴)';
-  let h = '<h5>轉強<span>' + hdr + '</span></h5>' + ms.slice().sort((a, b) => b.score - a.score).slice(0, 8).map(li).join('') +
-    '<h5>轉弱<span>' + hdr + '</span></h5>' + ms.slice().sort((a, b) => a.score - b.score).slice(0, 8).map(li).join('') +
+  const hdr = rrg ? '相對強度 5 日變化' : 'Y 變化(整條尾巴)';
+  // 依正負號分開:類股少時兩邊各取前 8 會重疊,轉強還會列出負分
+  let h = '<h5>轉強<span>' + hdr + '</span></h5>' + ms.filter(m => m.score > 0).sort((a, b) => b.score - a.score).slice(0, 8).map(li).join('') +
+    '<h5>轉弱<span>' + hdr + '</span></h5>' + ms.filter(m => m.score < 0).sort((a, b) => a.score - b.score).slice(0, 8).map(li).join('') +
     '<h5>象限交棒<span>尾巴起點 → 現在</span></h5>';
   const TRANS = rrg
     ? [['LU>RU', '改善 → 領先'], ['RU>RD', '領先 → 轉弱'], ['RD>LD', '轉弱 → 落後'], ['LD>LU', '落後 → 改善']]
@@ -732,12 +736,12 @@ function renderScDetail() {
   const el = document.getElementById('scDetail');
   const secs = [...sc.sel].slice(-4).map(c => R.sectors.find(s => s.code === c)).filter(Boolean);
   if (!secs.length) { el.innerHTML = '<span class="sub">點泡泡或右側名單選類股,這裡攤開它整段期間的 X / Y 走勢。</span>'; return; }
-  const first = Math.max(0, sc.end - scTail() * scStep()), rrg = scMode() === 'rrg';
+  const first = Math.max(0, sc.end - scTail() * scStep()), rrg = sc.mode === 'rrg';
   const spark = (vals, color) => {
     const w = 300, h = 44, v = vals.filter(x => x != null);
     if (!v.length) return '';
     let mn = Math.min(0, ...v), mx = Math.max(0, ...v); if (mx === mn) mx = mn + 1;
-    const X = i => i / (TN - 1) * w, Y = x => h - 3 - (x - mn) / (mx - mn) * (h - 6);
+    const X = i => i / Math.max(1, TN - 1) * w, Y = x => h - 3 - (x - mn) / (mx - mn) * (h - 6);
     let d = '', on = false;
     vals.forEach((x, i) => { if (x == null) { on = false; return; } d += (on ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x).toFixed(1); on = true; });
     return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none"><rect x="' + X(first) + '" y="0" width="' + Math.max(1, X(sc.end) - X(first)) + '" height="' + h + '" fill="' + TH.grid + '"/>' +
@@ -750,8 +754,8 @@ function renderScDetail() {
     for (let i = 0; i < TN; i++) { const p = scXY(s, i); xs.push(p ? p[0] : null); ys.push(p ? p[1] : null); }
     const p = scXY(s, sc.end);
     return '<div class="sc-drow"><div><b>' + s.name + '</b><div class="sub">' + s.parent + (p ? ' ・ ' + scQName(p) : '') + '</div></div>' +
-      '<div><div class="sub">' + (rrg ? '3m 超額' : '3m') + ' ' + fmt(p && p[0]) + '</div>' + spark(xs, TH.axis) + '</div>' +
-      '<div><div class="sub">' + (rrg ? '超額 5 日變化' : LBL[scMode()]) + ' ' + fmt(p && p[1]) + '</div>' + spark(ys, '#2962ff') + '</div></div>';
+      '<div><div class="sub">' + (rrg ? '相對強度 vs 63 日均' : '3m') + ' ' + fmt(p && p[0]) + '</div>' + spark(xs, TH.axis) + '</div>' +
+      '<div><div class="sub">' + (rrg ? '相對強度 5 日變化' : LBL[sc.mode]) + ' ' + fmt(p && p[1]) + '</div>' + spark(ys, '#2962ff') + '</div></div>';
   }).join('');
 }
 function scStop() { clearInterval(sc.timer); sc.timer = null; document.getElementById('scPlay').textContent = '▶ 播放'; }
@@ -760,7 +764,13 @@ scEnd.min = 0; scEnd.max = Math.max(0, TN - 1); scEnd.value = TN - 1;
 scEnd.oninput = () => { sc.end = +scEnd.value; renderScatter(); };
 document.getElementById('scPlay').onclick = () => {
   if (sc.timer) return scStop();
-  if (sc.end >= TN - 1) sc.end = Math.min(TN - 1, scTail() * scStep());
+  if (sc.end >= TN - 1) {
+    // 從第一個有點的日子 + 一條尾巴開始播,別先閃一段空圖
+    const secs = filtered();
+    let i0 = 0;
+    while (i0 < TN - 1 && !secs.some(s => scXY(s, i0))) i0++;
+    sc.end = Math.min(TN - 1, i0 + scTail() * scStep());
+  }
   document.getElementById('scPlay').textContent = '❚❚ 暫停';
   sc.timer = setInterval(() => {
     if (view !== 'scatter' || sc.end >= TN - 1) return scStop();

@@ -154,9 +154,17 @@ const TARGETS = {
   m6: minusMonths(latestDate, 6),
   m12: minusMonths(latestDate, 12),
 };
+// 第 t 天往回找目標日(含)以前最近的交易日 index(找不到 = -1)
+const baseOf = (t, target) => { let i = t; while (i >= 0 && dates[i] > target) i--; return i; };
+// 個股序列中 pos ≤ idx 的最近一筆位置(沒有 = -1)
+function seqAt(s, idx) {
+  let lo = 0, hi = s.pos.length - 1, found = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (s.pos[mid] <= idx) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+  return found;
+}
 // 全市場層級的基準交易日(顯示用)
 const baseDates = Object.fromEntries(Object.entries(TARGETS).map(([k, target]) => {
-  let i = T; while (i >= 0 && dates[i] > target) i--;
+  const i = baseOf(T, target);
   return [k, i >= 0 ? dates[i] : null];
 }));
 const baseIdx = Object.fromEntries(Object.entries(baseDates).map(([k, d]) => [k, d ? dates.indexOf(d) : -1]));
@@ -174,9 +182,7 @@ function stockMetrics(id) {
   for (const k of Object.keys(TARGETS)) {
     const bi = baseIdx[k];
     if (bi < 0) { m[k] = null; continue; }
-    // 個股序列中 ≤ 基準日的最近一筆
-    let lo = 0, hi = s.pos.length - 1, found = -1;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; if (s.pos[mid] <= bi) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+    const found = seqAt(s, bi);
     m[k] = found >= 0 ? (cumT / s.cum[found] - 1) * 100 : null;
   }
   return m;
@@ -194,8 +200,7 @@ for (const c of categories) c.stocks = c.stocks.filter(s => !INNOVATION.test(s.n
 function cumAt(id, idx) {
   const s = series.get(id);
   if (!s) return null;
-  let lo = 0, hi = s.pos.length - 1, found = -1;
-  while (lo <= hi) { const mid = (lo + hi) >> 1; if (s.pos[mid] <= idx) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+  const found = seqAt(s, idx);
   return found >= 0 ? s.cum[found] : null;
 }
 
@@ -421,35 +426,44 @@ for (const { id, s, rank } of universe) {
 writeFileSync(join(ROOT, 'docs', 'scanner.js'),
   'window.SCANNER=' + JSON.stringify({ date: latestDate, universe: universe.length, stocks: scanStocks }) + ';', 'utf8');
 
-// ---------- docs/trails.js(動能散點軌跡:近 130 個保留日,每天 as-of 重算類股 3m/1m/1w) ----------
-// 每一點 = 那天跑報表會得到的值(成分股當天有成交才計、權重 = 當天成交金額占比、基準日同 TARGETS 規則),
-// 所以軌跡最後一點就是今天的散點。不用連鎖指數:它跟報表口徑差很大(2026-10-22 PCB-材料設備 3m
-// 連鎖 23% vs 報表 43%,報表拿今天的量加權會偏向近期爆量的贏家),頭對不上散點會讓人看不懂。
+// ---------- docs/trails.js(動能散點軌跡:近 130 個保留日) ----------
+// m3/w1:每一點 = 那天跑報表會得到的值(成分股當天有成交才計、權重 = 當天成交金額占比、基準日同
+// TARGETS 規則),所以原軸軌跡最後一點就是今天的散點。這組不用連鎖指數:它跟報表口徑差很大(2026-10-22
+// PCB-材料設備 3m 連鎖 23% vs 報表 43%,報表拿今天的量加權會偏向近期爆量的贏家),頭對不上散點會讓人看不懂。
+// rx/ry(RRG)反過來必須用連鎖指數:滾動 3m 報酬的 5 日差分 ≈ 最近 5 日報酬 − 三個月前剛滾出窗口的 5 日報酬,
+// 轉強/轉弱會被三個月前的行情帶著走。所以照正統 RRG 在固定基期上建相對強度線
+// RS = 類股連鎖指數 / 加權報酬指數(類股是還原權息,基準也要含息,否則除息季高殖利率類股平白多出超額),
+// X = RS 相對自己 63 日均線的 %(再取 5 日均),Y = X 的 5 日變化 —— 均線每天只換掉 1/63,Y 幾乎只反映最近
+// 5 日的相對表現。不取 5 日均的話每個類股 130 天內換象限 32 次(2026-10-22 實測),取了 17 次。
+// 連鎖指數日報酬 = 兩天都有成交的成分股還原報酬,按「前一日」成交金額加權(當天的量會偏向當天的贏家)。
 {
-  const TRAIL_N = 130;
-  const tDays = [];
-  for (let i = T; i >= 0 && tDays.length < TRAIL_N; i--) if (!dropped[i]) tDays.unshift(i);
-  const HZ = { m3: d => minusMonths(d, 3), m1: d => minusMonths(d, 1), w1: d => minusDays(d, 7) };
-  const bases = tDays.map(t => Object.fromEntries(Object.entries(HZ).map(([k, f]) => {
-    const target = f(dates[t]);
-    let i = t; while (i >= 0 && dates[i] > target) i--;
-    return [k, i];
-  })));
-  // 個股在第 t 天的序列位置(當天沒成交 = -1)
-  const posOf = (s, t) => {
-    let lo = 0, hi = s.pos.length - 1;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; if (s.pos[mid] === t) return mid; if (s.pos[mid] < t) lo = mid + 1; else hi = mid - 1; }
-    return -1;
-  };
+  const TRAIL_N = 130, RS_N = 63, SM_N = 5, MOM_N = 5;
+  const kept = [];
+  for (let i = 0; i <= T; i++) if (!dropped[i]) kept.push(i);
+  const tDays = kept.slice(-TRAIL_N);
+  const cDays = kept.slice(-(TRAIL_N + RS_N - 1 + SM_N - 1 + MOM_N));   // 連鎖指數多抓 warm-up,rx/ry 第一天就有值
+  const off = cDays.length - tDays.length;
+  const HZ = { m3: d => minusMonths(d, 3), w1: d => minusDays(d, 7) };
+  const bases = tDays.map(t => Object.fromEntries(Object.entries(HZ).map(([k, f]) => [k, baseOf(t, f(dates[t]))])));
+  const tr = new Map();
+  const trFile = join(ROOT, 'data', 'taiex_tr.csv');
+  if (existsSync(trFile)) for (const l of readFileSync(trFile, 'utf8').split('\n').slice(1)) {
+    const [d, v] = l.split(',');
+    if (d && +v > 0) tr.set(d, +v);
+  }
+  // 報酬指數晚到(MFI94U 跟 daily 不同步)就沿用最近一筆,頁面標註,別讓預設 RRG 整張空白
+  const bench = cDays.map(i => { while (i >= 0 && !tr.has(dates[i])) i--; return i >= 0 ? tr.get(dates[i]) : null; });
+  const benchDate = [...tr.keys()].filter(d => d <= latestDate).sort().pop() ?? null;
+  if (benchDate !== latestDate) process.stderr.write(`WARNING: taiex_tr.csv 最新 ${benchDate},報表 ${latestDate} —— RRG 基準沿用舊值\n`);
   const trailSecs = {};
   for (const cat of categories) {
     const ids = cat.stocks.map(x => x.id).filter(id => series.has(id));
-    const out = { m3: [], m1: [], w1: [] };
+    const out = { m3: [], w1: [], rx: [], ry: [] };
     tDays.forEach((t, n) => {
-      const acc = { m3: [0, 0], m1: [0, 0], w1: [0, 0] };
+      const acc = { m3: [0, 0], w1: [0, 0] };
       for (const id of ids) {
-        const s = series.get(id), j = posOf(s, t);
-        if (j < 0) continue;
+        const s = series.get(id), j = seqAt(s, t);
+        if (j < 0 || s.pos[j] !== t) continue;
         for (const k in acc) {
           const cb = cumAt(id, bases[n][k]);
           if (cb != null) { acc[k][0] += s.to[j] * (s.cum[j] / cb - 1); acc[k][1] += s.to[j]; }
@@ -457,21 +471,40 @@ writeFileSync(join(ROOT, 'docs', 'scanner.js'),
       }
       for (const k in acc) out[k].push(acc[k][1] > 0 ? +(acc[k][0] / acc[k][1] * 100).toFixed(1) : null);
     });
+    let lvl = 1;
+    const rs = cDays.map((t, n) => {
+      if (n) {
+        let num = 0, den = 0;
+        for (const id of ids) {
+          const s = series.get(id), j = seqAt(s, t);
+          if (j < 1 || s.pos[j] !== t || s.pos[j - 1] !== cDays[n - 1]) continue;
+          num += s.to[j - 1] * s.cum[j] / s.cum[j - 1]; den += s.to[j - 1];
+        }
+        if (den > 0) lvl *= num / den;
+      }
+      return bench[n] ? lvl / bench[n] : null;
+    });
+    const rx = rs.map((v, n) => {
+      if (v == null || n < RS_N - 1) return null;
+      let sum = 0;
+      for (let q = n - RS_N + 1; q <= n; q++) { if (rs[q] == null) return null; sum += rs[q]; }
+      return (v / (sum / RS_N) - 1) * 100;
+    });
+    const xs = rx.map((v, n) => {
+      if (n < SM_N - 1) return null;
+      let sum = 0;
+      for (let q = n - SM_N + 1; q <= n; q++) { if (rx[q] == null) return null; sum += rx[q]; }
+      return sum / SM_N;
+    });
+    for (let n = off; n < cDays.length; n++) {
+      const x = xs[n], xp = xs[n - MOM_N];
+      out.rx.push(x == null ? null : +x.toFixed(1));
+      out.ry.push(x == null || xp == null ? null : +(x - xp).toFixed(1));
+    }
     trailSecs[cat.code] = out;
   }
-  // RRG 的基準:加權指數同口徑 as-of 報酬(價格指數,基準日沒值就往前找)
-  const tx = new Map();
-  if (existsSync(idxFile)) for (const l of readFileSync(idxFile, 'utf8').split('\n').slice(1)) {
-    const [d, v] = l.split(',');
-    if (d && +v > 0) tx.set(d, +v);
-  }
-  const txAt = i => { while (i >= 0 && !tx.has(dates[i])) i--; return i >= 0 ? tx.get(dates[i]) : null; };
-  const taiex = Object.fromEntries(Object.keys(HZ).map(k => [k, tDays.map((t, n) => {
-    const a = tx.get(dates[t]), b = txAt(bases[n][k]);
-    return a && b ? +((a / b - 1) * 100).toFixed(1) : null;
-  })]));
   writeFileSync(join(ROOT, 'docs', 'trails.js'),
-    'window.TRAILS=' + JSON.stringify({ date: latestDate, dates: tDays.map(t => dates[t]), taiex, sectors: trailSecs }) + ';', 'utf8');
+    'window.TRAILS=' + JSON.stringify({ date: latestDate, dates: tDays.map(t => dates[t]), benchDate, sectors: trailSecs }) + ';', 'utf8');
 }
 
 // ---------- docs/themes.js(MoneyDJ 細產業:題材標籤 + 題材熱度榜) ----------
