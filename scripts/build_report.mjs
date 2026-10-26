@@ -525,21 +525,25 @@ if (existsSync(join(ROOT, 'data', 'moneydj.json'))) {
     if (!mcache.has(id)) mcache.set(id, stockMetrics(id));
     return mcache.get(id);
   };
-  const themes = [];
-  for (const sub of mdj.subs) {
-    const mem = sub.stocks.filter(id => met(id));
-    if (!mem.length) continue;
-    const row = {
-      name: sub.name, g: sub.gname.replace(/類$/, ''), n: mem.length,
-      turnover: mem.reduce((a, id) => a + (met(id).turnover || 0), 0), ids: mem,
-    };
+  const agg = (name, g, ids) => {
+    const mem = [...new Set(ids)].filter(id => met(id));
+    if (!mem.length) return null;
+    const row = { name, g: g.replace(/類$/, ''), n: mem.length, turnover: mem.reduce((a, id) => a + (met(id).turnover || 0), 0), ids: mem };
     for (const k of METRICS) row[k] = median(mem.map(id => met(id)[k]));
-    themes.push(row);
+    return row;
+  };
+  const byTurnover = (a, b) => b.turnover - a.turnover;   // 標籤依成交金額排,個股的第一個標籤就是它最主流的題材
+  const themes = mdj.subs.map(s => agg(s.name, s.gname, s.stocks)).filter(Boolean).sort(byTurnover);
+  // 產業層(121 類,每個只屬一個大類):成分 = 底下細產業聯集,同樣取中位數
+  const indMap = new Map();
+  for (const s of mdj.subs) if (s.ind) {
+    if (!indMap.has(s.ind)) indMap.set(s.ind, { g: s.gname, ids: [] });
+    indMap.get(s.ind).ids.push(...s.stocks);
   }
-  themes.sort((a, b) => b.turnover - a.turnover);   // 標籤依成交金額排,個股的第一個標籤就是它最主流的題材
+  const inds = [...indMap].map(([name, v]) => agg(name, v.g, v.ids)).filter(Boolean).sort(byTurnover);
   writeFileSync(join(ROOT, 'docs', 'themes.js'),
-    'window.THEMES=' + JSON.stringify({ date: latestDate, updated: mdj.updated, list: themes }) + ';', 'utf8');
-  console.error(`themes: ${themes.length} 個 MoneyDJ 細產業有成分股(來源 ${mdj.subs.length} 個,分類更新於 ${mdj.updated})`);
+    'window.THEMES=' + JSON.stringify({ date: latestDate, updated: mdj.updated, list: themes, inds }) + ';', 'utf8');
+  console.error(`themes: ${themes.length} 個 MoneyDJ 細產業 / ${inds.length} 個產業有成分股(來源 ${mdj.subs.length} 個,分類更新於 ${mdj.updated})`);
 }
 
 console.error(`Report built for ${latestDate}: ${sectors.length} sectors, ${scanStocks.length} scan stocks -> docs/data.js, docs/scanner.js, docs/report.json, README.md`);

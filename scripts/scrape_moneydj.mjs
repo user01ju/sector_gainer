@@ -45,6 +45,19 @@ async function fetchTree() {
   return subs;
 }
 
+// JS 樹只給 大類→細產業,中間那層 121「產業別」只在 zha.djhtm 表格裡(真正的樹是 26→121→1063)。
+// 產業別 = <td class="t3t1(_rev)"> 不帶 width 那格,細產業 = width="25%" 的格;產業別本身沒有代碼
+// (連結指向底下某個細產業)。名稱這頁全大寫(LIDAR vs LiDAR),只取代碼 -> 產業名。
+async function fetchIndustries() {
+  const html = await getBig5('https://www.moneydj.com/z/zh/zha/zha.djhtm');
+  const map = new Map();
+  for (const blk of html.split(/<td class="t3t1(?:_rev)?"><a /).slice(1)) {
+    const ind = blk.match(/^href="[^"]*">([^<]*)/)?.[1];
+    for (const m of blk.matchAll(/width="25%"><a href="[^"]*a=(\w+)">/g)) map.set(m[1], ind);
+  }
+  return map;
+}
+
 const RE_STK = /Link2Stk\('[A-Z]{2}([0-9A-Z]+)'\);">/g;
 
 async function main() {
@@ -78,8 +91,8 @@ async function main() {
 
   // 部分改版防呆(比照 scrape_categories.mjs):跟現有檔比,總筆數掉 >15% 或原本 >=3 檔的分類變空就中止(單檔分類被改歸類很常見,不算改版)
   const dest = join(ROOT, 'data', 'moneydj.json');
-  if (existsSync(dest)) {
-    const prev = JSON.parse(readFileSync(dest, 'utf8'));
+  const prev = existsSync(dest) ? JSON.parse(readFileSync(dest, 'utf8')) : null;
+  if (prev) {
     const prevTotal = prev.subs.reduce((s, x) => s + x.stocks.length, 0);
     const prevNonEmpty = new Set(prev.subs.filter(x => x.stocks.length >= 3).map(x => x.id));
     const wentEmpty = out.filter(x => !x.stocks.length && prevNonEmpty.has(x.id));
@@ -88,10 +101,16 @@ async function main() {
     }
   }
 
+  // 產業層是次要資訊:抓不到或改版就沿用前次的對應,不擋細產業成分股更新
+  let inds = new Map();
+  try { inds = await fetchIndustries(); } catch (e) { process.stderr.write(`WARN 產業別抓取失敗:${e.message}\n`); }
+  if (inds.size < out.length * 0.9) process.stderr.write(`WARN 產業別只對到 ${inds.size}/${out.length} 細產業,缺的沿用前次\n`);
+  for (const x of prev?.subs || []) if (x.ind && !inds.has(x.id)) inds.set(x.id, x.ind);
+
   mkdirSync(join(ROOT, 'data'), { recursive: true });
   writeFileSync(dest, JSON.stringify({
     updated: new Date().toISOString().slice(0, 10),
-    subs: out.map(({ id, name, gid, gname, stocks }) => ({ id, name, gid, gname, stocks })),
+    subs: out.map(({ id, name, gid, gname, stocks }) => ({ id, name, gid, gname, ind: inds.get(id) || '', stocks })),
   }), 'utf8');
   process.stderr.write(`Done: ${out.length} 細產業(${out.filter(x => !x.stocks.length).length} 空),${total} 筆成分股,${uniq} 檔不重複\nSaved -> ${dest}\n`);
 }
