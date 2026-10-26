@@ -299,9 +299,11 @@
 
     <h4>市場趨勢 / 頁首燈號</h4>
     <dl>
-      <dt>🟢 / 🔴 燈號</dt><dd>加權、櫃買各自的 MA3 vs MA9 交叉:🟢 MA3 &gt; MA9 可進攻、🔴 MA3 &lt; MA9 不開新倉。指數圖底部柱狀 = MA3 − MA9(綠正紅負,獨立比例尺)。</dd>
-      <dt>&gt; 20MA 比例</dt><dd>全市場收盤在 20 日均線之上的家數比例。&gt; 60% 順風、&lt; 50% 警戒、&lt; 30% 留意超賣反轉。</dd>
-      <dt>52 週淨新高</dt><dd>創 52 週新高家數 − 新低家數(還原序列計,上市滿半年才列入)。指數創高但淨新高轉負 = 背離,該收緊停損。</dd>
+      <dt>🟢 / 🔴 燈號</dt><dd>加權、櫃買各自的 MA3 vs MA9 交叉:🟢 MA3 &gt; MA9 可進攻、🔴 MA3 &lt; MA9 不開新倉。指數圖底部柱狀 = MA3 − MA9(綠正紅負,獨立比例尺)。長期回測它是<b>回撤濾網,不是報酬訊號</b>:只在綠燈持有 2007~2023 最大回撤 −34% vs 一路抱 −56%,但年化 7.1% vs 9.2%;約 8 天翻一次。</dd>
+      <dt>&gt; 20MA 比例</dt><dd>全市場收盤在 20 日均線之上的家數比例。門檻用<b>近一年分位數</b>(圖上虛線 P10/P50/P90),不寫死:這輪多頭中位數只有 47%,2007~2023 長期是 50%。&ge; P90 強勢(長期回測 &gt;90% 之後 60 日平均 +7.5%,<b>不是頂</b>)、P50~P90 順風、P10~P50 偏弱、&lt; P10 超賣區 —— 超賣<b>單看不夠</b>,空頭裡第一次跌破常常太早(2008 兩段之後 20 日 −14%)。</dd>
+      <dt>🟢 推力</dt><dd>&gt;20MA 比例 10 個交易日內從 &lt;20% 拉到 &gt;70%。2007~2023 共 15 次,之後 20 日勝率 87%、60 日平均 +5.7%(基準 +2.5%)。門檻放寬(&lt;30 → &gt;50)就變雜訊。「已武裝」= 近 10 日低點已 &lt;20,等衝過 70。</dd>
+      <dt>🟠 正背離</dt><dd>加權創 60 日新低,但 &gt;20MA 比例比前 30 日最低點(須 &lt;10%)高出 10pt 以上 = 廣度先見底。2007~2023 共 11 次,之後 20 日中位 +6.2%(所有 60 日新低只有 +1.8%);2008、2018、2022 谷底都是這型,失敗例 2008-10。「已武裝」= 前 30 日低點已 &lt;10,等加權再破底。</dd>
+      <dt>52 週淨新高</dt><dd>創 52 週新高家數 − 新低家數(還原序列計,上市滿半年才列入)。長期回測:新低爆量(淨值 &lt; 合格檔數 −20%)之後 20 日勝率 48%,<b>不是抄底訊號</b>(空頭會連續好幾波新低潮);「指數創高但淨新高轉弱」的背離也沒有看空 edge。當作行情寬窄的描述,不當進出依據。</dd>
       <dt>燈號 vs 廣度打架時</dt><dd>信廣度。指數可以被權值股扛住,中小型突破股不行。</dd>
     </dl>
 
@@ -961,7 +963,10 @@ function lineChart(title, dates, seriesArr, opts = {}) {
   const W = 980, H = 200, M = { l: 56, r: 12, t: 24, b: 22 };
   let all = [];
   for (const s of seriesArr) all = all.concat(s.vals.filter(v => v != null));
-  if (opts.bars || opts.refline != null) all.push(opts.refline ?? 0);
+  // refline:數字或 [{ v, label }](多條參考線)
+  const refs = [].concat(opts.refline ?? []).map(r => typeof r === 'number' ? { v: r, label: '' } : r);
+  if (opts.bars) all.push(0);
+  for (const r of refs) all.push(r.v);
   let mn, mx;
   if (opts.ymin != null && opts.ymax != null) { mn = opts.ymin; mx = opts.ymax; }
   else { mn = Math.min(...all); mx = Math.max(...all); const pad = (mx - mn) * 0.06 || 1; mn -= pad; mx += pad; }
@@ -975,7 +980,8 @@ function lineChart(title, dates, seriesArr, opts = {}) {
     '<text x="' + (M.l - 6) + '" y="' + (Y(t) + 4) + '" font-size="10" fill="' + TH.axis + '" text-anchor="end">' + (Math.abs(t) >= 10000 ? Math.round(t / 1000) + 'k' : +t.toFixed(1)) + '</text>';
   const step = Math.max(1, Math.floor(n / 6));
   for (let i = 0; i < n; i += step) g += '<text x="' + X(i) + '" y="' + (H - 6) + '" font-size="10" fill="' + TH.axis + '" text-anchor="middle">' + dates[i].slice(2, 7) + '</text>';
-  if (opts.refline != null) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(opts.refline) + '" y2="' + Y(opts.refline) + '" stroke="' + TH.zero + '" stroke-dasharray="4 3"/>';
+  for (const r of refs) g += '<line x1="' + M.l + '" x2="' + (W - M.r) + '" y1="' + Y(r.v) + '" y2="' + Y(r.v) + '" stroke="' + TH.zero + '" stroke-dasharray="4 3"/>' +
+    (r.label ? '<text x="' + (M.l + 4) + '" y="' + (Y(r.v) - 3) + '" font-size="10" fill="' + TH.axis + '">' + r.label + '</text>' : '');
   if (opts.bars) {
     const bw = Math.max(1, (W - M.l - M.r) / n - 1);
     const s = seriesArr[0];
@@ -1005,6 +1011,11 @@ function lineChart(title, dates, seriesArr, opts = {}) {
       for (let i = 0; i < n; i++) if (s.vals[i] != null) pts.push(X(i).toFixed(1) + ',' + Y(s.vals[i]).toFixed(1));
       g += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.w || 1.2) + '"' + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') + '/>';
     }
+    // 訊號點:標在第一條序列上
+    for (const mk of opts.marks || []) {
+      const v = seriesArr[0].vals[mk.i];
+      if (v != null) g += '<circle cx="' + X(mk.i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="4.5" fill="' + mk.color + '" stroke="' + TH.panel + '"><title>' + dates[mk.i] + ' ' + mk.label + '</title></circle>';
+    }
     let lx = W - M.r - 10;
     for (const s of [...seriesArr].reverse()) {
       g += '<text x="' + lx + '" y="15" font-size="10" fill="' + s.color + '" text-anchor="end">' + s.label + '</text>';
@@ -1012,6 +1023,22 @@ function lineChart(title, dates, seriesArr, opts = {}) {
     }
   }
   return g + '</svg>';
+}
+// 廣度反轉訊號,門檻來自 2007~2023 回測(llm_wiki: tw-market-breadth-vs-taiex);a=>20MA 比例、px=加權收盤,同一主軸
+function breadthSignals(a, px) {
+  const n = a.length, thrust = [], posdiv = [];
+  const minIn = (arr, s, e) => { let m = Infinity; for (let k = Math.max(0, s); k <= e; k++) if (arr[k] != null && arr[k] < m) m = arr[k]; return m; };
+  let rawT = -99, rawD = -99;  // 連續觸發只記第一天(前 10 日有觸發就不算新事件)
+  for (let i = 0; i < n; i++) {
+    if (a[i] == null) continue;
+    // 推力:10 日內從 <20 拉到 >70
+    if (a[i] > 70 && minIn(a, i - 9, i) < 20) { if (i - rawT > 10) thrust.push(i); rawT = i; }
+    // 正背離:加權創 60 日新低,但比例比前 30 日最低點(<10)高 10pt 以上
+    const lo30 = minIn(a, i - 30, i - 1);
+    if (i >= 59 && px[i] != null && px[i] <= minIn(px, i - 59, i) && lo30 < 10 && a[i] >= lo30 + 10) { if (i - rawD > 10) posdiv.push(i); rawD = i; }
+  }
+  const L = n - 1, mn10 = minIn(a, L - 9, L), mn30 = minIn(a, L - 30, L - 1);
+  return { thrust, posdiv, armThrust: mn10 < 20 ? mn10 : null, armDiv: mn30 < 10 ? mn30 : null };
 }
 function renderTrend() {
   const box = document.getElementById('trendBox');
@@ -1038,8 +1065,21 @@ function renderTrend() {
   const b0 = R.breadth;
   const b = b0 ? { ...b0, dates: cut(b0.dates), above20: cut(b0.above20), net: cut(b0.net) } : null;
   if (b) {
-    h += lineChart('全市場收盤 > 20MA 比例 %(目前 ' + b.above20[b.above20.length - 1] + '%,' + b.lastAbove + ' / ' + b.lastDenom + ')', b.dates,
-      [{ vals: b.above20, color: '#2962ff', w: 1.4, label: '' }], { refline: 50 });
+    // 分位數門檻:近一年(report 全部 breadth 日)分布,不寫死 50/60 —— 不同行情分布差很多
+    const sorted = b0.above20.filter(v => v != null).sort((x, y) => x - y);
+    const P = p => sorted[Math.floor((sorted.length - 1) * p)];
+    const cur = b.above20[b.above20.length - 1];
+    const rank = Math.round(sorted.filter(v => v <= cur).length / sorted.length * 100);
+    const zone = cur >= P(0.9) ? '強勢(順勢,不是頂)' : cur >= P(0.5) ? '順風' : cur >= P(0.1) ? '偏弱' : '超賣區(單看不夠,等推力/正背離)';
+    const sig = breadthSignals(b0.above20, (m0.taiex || {}).close || []);
+    const off = b0.dates.length - b.dates.length;
+    const last = arr => arr.length ? '最近 ' + b0.dates[arr[arr.length - 1]] : '近一年無';
+    h += '<p class="sub" style="margin:0 0 6px;padding:0 6px">&gt;20MA 目前 <b>' + cur + '%</b>,近一年第 ' + rank + ' 百分位(P10 ' + P(0.1) + ' / P50 ' + P(0.5) + ' / P90 ' + P(0.9) + ')→ <b>' + zone + '</b>'
+      + '<br>🟢 推力(10 日內 &lt;20 → &gt;70):' + last(sig.thrust) + (sig.armThrust != null ? ' · <b>已武裝</b>(10 日低 ' + sig.armThrust + ',等 &gt;70)' : '')
+      + ' · 🟠 正背離(加權破 60 日低、比例比前 30 日低點 &lt;10 墊高 10pt):' + last(sig.posdiv) + (sig.armDiv != null ? ' · <b>已武裝</b>(30 日低 ' + sig.armDiv + ',等加權破底時比例 ≥ ' + +(sig.armDiv + 10).toFixed(1) + ')' : '') + '</p>';
+    const marks = [...sig.thrust.map(i => ({ i: i - off, color: '#26a69a', label: '推力' })), ...sig.posdiv.map(i => ({ i: i - off, color: '#ff9800', label: '正背離' }))].filter(mk => mk.i >= 0);
+    h += lineChart('全市場收盤 > 20MA 比例 %(' + b.lastAbove + ' / ' + b.lastDenom + ',虛線 = 近一年 P10/P50/P90)', b.dates,
+      [{ vals: b.above20, color: '#2962ff', w: 1.4, label: '' }], { refline: [{ v: P(0.1), label: 'P10' }, { v: P(0.5), label: 'P50' }, { v: P(0.9), label: 'P90' }], marks });
     lines.push({ label: '>20MA', vals: b.above20, fmt: v => v + '%' });
     const ns = [...b.net].sort((x, y) => x - y);
     const q = p => Math.abs(ns[Math.floor(ns.length * p)]);
