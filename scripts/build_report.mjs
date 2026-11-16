@@ -128,7 +128,11 @@ rawDays.forEach((day, i) => {
     // 跨越剔除日/缺資料日最多允許 ±12% 複利兩次;再超出 = 未知資本事件(分割/減資),視為價值中性
     const gap = s.lastIdx == null ? 1 : Math.min(i - s.lastIdx, 2);
     const band = Math.pow(WILD, gap);
-    if (ret > band || ret < 1 / band) ret = 1;
+    // 兩種情況不套:(1) 有參考價的日子是已知事件。純現增除權日「減除股利參考價」= 前收,但交易所的跌停
+    // 照含權參考價算,close/ref 可以 < 1/1.12(3149 正達 2026-07-17:93.5 → 79.6 = -14.9%,套了就整天歸零)。
+    // (2) 掛牌前 5 個交易日無漲跌幅限制(資料起始日就在的股票不算新掛牌)。
+    const ipo = s.pos.length < 5 && s.pos[0] > 0;
+    if (exref == null && !ipo && (ret > band || ret < 1 / band)) ret = 1;
     s.cum.push((s.cum.length ? s.cum[s.cum.length - 1] : 1) * ret);
     s.pos.push(i);
     s.pc = close;

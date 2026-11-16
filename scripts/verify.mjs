@@ -564,6 +564,20 @@ function checkReportNoDroppedDays() {
   return ['PASS', 'build_report 未剔除任何交易日'];
 }
 
+// fetch_index 失敗而 fetch_daily 成功時,報表日沒有指數:頁首顯示「加權 0」+ 舊燈號,其他檢查全綠。
+// 報酬指數(RRG 基準)落後只影響一張圖且 build 會沿用舊值,給 WARN。
+function checkIndexCoversReport() {
+  const d = ctx.report.date;
+  const row = ctx.indexRows.find(r => r.date === d);
+  const miss = ['taiex', 'otc'].filter(k => !(row?.[k] > 0));
+  const last = ctx.indexRows.length ? ctx.indexRows[ctx.indexRows.length - 1].date : 'n/a';
+  if (miss.length) return ['FAIL', `market_index.csv 在報表日 ${d} 缺 ${miss.join('/')}(最新列 ${last}) — 頁首指數與燈號會是錯的,重跑 fetch_index.mjs`];
+  const p = join(ROOT, 'data', 'taiex_tr.csv');
+  const trLast = existsSync(p) ? splitCsv(p).slice(1).map(l => l.split(',')[0]).filter(x => ISO.test(x)).sort().pop() : null;
+  if (!trLast || trLast < d) return ['WARN', `market_index.csv 有 ${d};但 taiex_tr.csv 只到 ${trLast ?? 'n/a'},RRG 基準沿用舊值`];
+  return ['PASS', `market_index.csv 與 taiex_tr.csv 都有報表日 ${d}`];
+}
+
 // ---------------- Tier B(外部呼叫) ----------------
 
 let callsUsed = 0, lastCallAt = 0;
@@ -688,6 +702,7 @@ const TIER_A = [
   ['sector-gain-recalc', checkSectorRecalc],
   ['report-schema', checkReportSchema],
   ['market-index-integrity', checkMarketIndexIntegrity],
+  ['index-covers-report', checkIndexCoversReport],
   ['exrights-integrity', checkExrightsIntegrity],
   ['exrights-date-has-daily', checkExrightsDateHasDaily],
   ['hub-files-present', checkHubFiles],
